@@ -56,7 +56,11 @@ export
     PDAGtoCompletePDAG!,
 
 #mainAlgorithm.jl
-    fges
+    fges,
+    ParseData,
+    Search!,
+    Insert!,
+    Delete!
 
 
 end

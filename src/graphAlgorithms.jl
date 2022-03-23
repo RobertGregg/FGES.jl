@@ -197,6 +197,19 @@ function PDAGtoCompletePDAG!(g::PDAG)
 end 
 
 
+#better to loop through edges or vertices?
+function graphVStructure!(g::PDAG)
+    
+    for x in vertices(g)
+        parentsX = parents(g,x)
+        if length(parentsX) == 1
+            addedge!(g, x, parentsX[1], directed=false)
+        end
+    end
+end
+
+
+
 
 function meekRules(g::PDAG)
     
@@ -207,7 +220,7 @@ function meekRules(g::PDAG)
             parentNeighbors, childNeighbors =  get_categorized_neighbors(g, edge)
 
 
-            #If both x and y have parents (p₁ → x - y ← p₂) do we just not orient or is the graph not extendable? 
+            
         end
     end
 end

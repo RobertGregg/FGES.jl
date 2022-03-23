@@ -421,3 +421,6 @@ calcNAyx(g::PDAG, edge::Edge) = calcNAyx(g, edge.child, edge.parent)
 #for x-y, undirected neighbors of y not connected to x
 calcT(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y), neighbors(g,x), x)
 calcT(g::PDAG, edge::Edge) = calcT(g, edge.child, edge.parent)
+
+#count the number of parents a vertex has
+countParents(g::PDAG, x) = count(g.A[:,x] & !g.A[x,:])
