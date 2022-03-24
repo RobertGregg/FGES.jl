@@ -1,5 +1,5 @@
 ####################################################################
-# Graph Algorithms
+# Chickering's Version to Update PDAG
 ####################################################################
 
 
@@ -197,59 +197,160 @@ function PDAGtoCompletePDAG!(g::PDAG)
 end 
 
 
-#better to loop through edges or vertices?
+####################################################################
+# Ramsey's Version to Update PDAG
+####################################################################
+
+#Reduce a graph to undirected edges and unshielded colliders 
 function graphVStructure!(g::PDAG)
     
+    #loop through all vertices
     for x in vertices(g)
+        #get the parents of current vertex
         parentsX = parents(g,x)
-        if length(parentsX) == 1
-            addedge!(g, x, parentsX[1], directed=false)
+        #if all the parents are adjacent, undirect the edges
+        #(if there is only 1 parent, then it is still a clique)
+        if isclique(g, parentsX)
+            for p in parentsX
+                addedge!(g, x, p, directed=false)
+            end
         end
     end
 end
 
 
+#Would be be cleaner to find all unique triples where one edge is undirected?
 
-
-function meekRules(g::PDAG)
+#This is set up so we don't loop through all the vertices for every rule
+function meekRules!(g::PDAG)
     
-    #Loop through all the edges in the graph
+    #Loop through all the edges in the graph (x-y)
     for edge in edges(g)
         if !edge.directed
-            #Get the neighbors of the parent and child vertex
-            parentNeighbors, childNeighbors =  get_categorized_neighbors(g, edge)
+            #Label the neighbors of the parent and child vertex
+            #Neighbors can be labelled "parent", "child", or "undirected"
+            #e.g. v₁→x-v₂, v₁ is a parent and v₂ is undirected
+            xNeighbors, yNeighbors =  categorizeNeighbors(g, edge)
 
 
+            #Rule 1: If x or y have a unique parent, direct edge away from it
+            #Check if x has a unique parent 
+            if R1(xNeighbors, yNeighbors)
+                addedge!(g, edge.parent, edge.child)
+            elseif R1(yNeighbors, xNeighbors)
+                addedge!(g, edge.child, edge.parent)
+            end
+
+            #Rule 2: Direct the edge away from a potential cycle
+            #Check if x has a child that is a parent of y
+            if R2(xNeighbors, yNeighbors)
+                addedge!(g, edge.parent, edge.child)
+            elseif R2(yNeighbors, xNeighbors)
+                addedge!(g, edge.child, edge.parent)
+            end
+
+            #Rule 3: Double Triangle, diagonal
+            if R3(xNeighbors, yNeighbors)
+                addedge!(g, edge.parent, edge.child)
+            elseif R3(yNeighbors, xNeighbors)
+                addedge!(g, edge.child, edge.parent)
+            end
+
+            #Rule 4: Double Triangle, side
+            if R4(xNeighbors, yNeighbors, g)
+                addedge!(g, edge.parent, edge.child)
+            elseif R4(yNeighbors, xNeighbors, g)
+                addedge!(g, edge.child, edge.parent)
+            end
             
         end
     end
+
+    return nothing
 end
 
 
-function get_categorized_neighbors(g::PDAG, edge::Edge)
-    x, y = edge.parent, edge.child
-
-    parentNeighbors = Dict{Int, Symbol}()
-    childNeighbors = Dict{Int, Symbol}()
-    for vᵢ in vertices(g)
-        if isadjacent(g, x, vᵢ)
-            parentNeighbors[vᵢ] = set_category(g, x, vᵢ)
+function R1(neighborSet1, neighborSet2)
+    #given x-y, look for patterns that match v₁→x but not(v₁→y)
+    for (v₁, category) in neighborSet1
+        if category == :parent && haskey(neighborSet2,v₁)
+            return true
         end
+    end
+    return false
+end
 
-        if isadjacent(g, y, vᵢ)
-            childNeighbors[vᵢ] = set_category(g, y, vᵢ)
+function R2(neighborSet1, neighborSet2)
+    #given x-y, look for patterns that match x→v₁→y
+    for (v₁, category) in neighborSet1
+        if category == :child && haskey(neighborSet2,v₁) && neighborSet2[v₁]==:parent
+            return true
+        end
+    end
+    return false
+end
+
+function R3(neighborSet1, neighborSet2)
+        
+    #given x-y, count the number of patterns that match x-v₁→y
+    counter = 0
+    for (v₁, category) in neighborSet1
+        if category == :undirected && haskey(neighborSet2,v₁) && neighborSet2[v₁]==:parent
+            counter += 1
+            if counter == 2
+                return true
+            end
         end
     end
 
-    return (parentNeighbors, childNeighbors)
+    return false
 end
 
-function set_category(g::PDAG, x::Integer, y::Integer)
-    if isparent(g,x,y)
+function R4(neighborSet1, neighborSet2, g)
+        
+    #given x-y, look for patterns that match x-v₁→v₂→y and x-v₂
+    for (v₂, category) in neighborSet1
+        #first look for x-v₂→y
+        if category == :undirected && haskey(neighborSet2,v₂) && neighborSet2[v₂]==:parent
+            #check for x-v₁ and v₁→v₂
+            for (v₁, category) in neighborSet1
+                if category == :undirected && isparent(g, v₁, v₂)
+                    return true
+                end
+            end
+        end 
+    end
+
+    return false
+end
+
+
+
+function categorizeNeighbors(g::PDAG, edge::Edge)
+    x, y = edge.parent, edge.child
+
+    xNeighbors = Dict{Int, Symbol}()
+    yNeighbors = Dict{Int, Symbol}()
+    for vᵢ in vertices(g)
+        if isadjacent(g, x, vᵢ)
+            xNeighbors[vᵢ] = setCategory(g, x, vᵢ)
+        end
+
+        if isadjacent(g, y, vᵢ)
+            yNeighbors[vᵢ] = setCategory(g, y, vᵢ)
+        end
+    end
+
+    return (xNeighbors, yNeighbors)
+end
+
+function setCategory(g::PDAG, x::Integer, y::Integer)
+    if isparent(g,y,x)
         return :parent
-    elseif ischild(g,x,y)
+    elseif ischild(g,y,x)
         return :child
     else
         return :undirected
     end
 end
+

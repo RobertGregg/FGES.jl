@@ -45,15 +45,30 @@ export
     parents,
     children,
 
+    countNeighbors,
+    countNeighbors_in,
+    countNeighbors_out,
+    countNeighbors_undirect,
+    countParents,
+    countChildren,
+
     allundirected,
     alldirected,
     alledges,
 
     edges,
     vertices,
+    countParents,
 
-#graphStructure.jl
+    calcNAyx,
+
+#graphAlgorithms.jl
     PDAGtoCompletePDAG!,
+    graphVStructure!,
+    PDAGtoDAG!,
+    categorizeNeighbors,
+    setCategory!,
+    meekRules!,
 
 #mainAlgorithm.jl
     fges,

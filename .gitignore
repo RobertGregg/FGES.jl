@@ -1,2 +1,4 @@
 /Manifest.toml
 /docs/build/
+/test/causal-cmd-1.3.0-jar-with-dependencies.jar
+/test/causal-cmd.log

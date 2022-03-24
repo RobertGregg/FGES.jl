@@ -46,6 +46,11 @@ function show(io::IO, d::ParseData{T}) where T
     print(io, "$(d.numObservations)×$(d.numFeatures) ParseData{$(T)}")
 end
 
+#Print method to display the Step
+function show(io::IO, newStep::Step{A,B}) where {A,B}
+    print(io, "Edge: $(newStep.edge), Subset: $(newStep.subset), Δscore: $(newStep.Δscore)")
+end
+
 #This could be dangerous. The @memoize macro has to check if ParseData is the same argument. We only ever define one immutable ParseData, so it will never change. Any equality check should be true.
 ==(a::T, b::T) where T <: ParseData = true
 
@@ -66,12 +71,12 @@ function fges(data; debug=false)
     #Create an empty graph with one node for each feature
     g = PDAG(dataParsed.numFeatures)
 
-    #Perform the forward search 
     debug && printstyled("Start forward search\n"; color=:blue, bold=true)
+    #Perform the forward search 
     Search!(g, dataParsed, Insert!, debug)
 
-    #Perform the backward search 
     debug && printstyled("Start backward search\n"; color=:red, bold=true)
+    #Perform the backward search 
     Search!(g, dataParsed, Delete!, debug)
     
     #Return the graph
@@ -82,7 +87,7 @@ end
 # Insert and Delete Operators
 ####################################################################
 
-function Insert!(g, newStep::Step) 
+function Insert!(g::PDAG, newStep::Step) 
     edge = newStep.edge
     T = newStep.subset
 
@@ -99,7 +104,7 @@ function Insert!(g, newStep::Step)
 end
 
 
-function Delete!(g, newStep::Step)
+function Delete!(g::PDAG, newStep::Step)
     edge = newStep.edge
     H = newStep.subset
 
@@ -108,7 +113,7 @@ function Delete!(g, newStep::Step)
     
     #Orient all vertices in H toward x and y
     x,y = edge.parent, edge.child
-    for h ∈ Hs
+    for h ∈ H
         addedge!(g,y,h) #h→y
         addedge!(g,x,h) #h→x
     end
@@ -146,7 +151,9 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         operator(g, newStep)
 
         #Covert the PDAG to a complete PDAG
-        PDAGtoCompletePDAG!(g)
+        #PDAGtoCompletePDAG!(g)
+        graphVStructure!(g)
+        meekRules!(g)
 
         #Reset the score
         newStep.Δscore = zero(A)
@@ -277,7 +284,7 @@ end
 ####################################################################
 
 @memoize LRU(maxsize=1_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
-    debug && println("Parents: $(nodeParents), Child: $(node)")
+    #debug && println("Parents: $(nodeParents), Child: $(node)")
     #Unpack some variables from the dataParsed structure
     n = A(dataParsed.numObservations) #convert datatype
     scatterMat = dataParsed.scatterMat

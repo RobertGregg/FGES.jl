@@ -260,6 +260,11 @@ function isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
         dest = searchsortedfirst(nodeSubset,dest)
     end
 
+    #first check if scr or dest have no neighbors
+    if countNeighbors(g, src)==0 || countNeighbors(g, dest)==0
+        return true
+    end
+
     #Keep track of all the nodes visited and a queue of nodes to visit
     visited = falses(nv(g))
     queue = [src]
@@ -325,21 +330,64 @@ remedge!(g::PDAG, edge::Edge) = remedge!(g, edge.parent, edge.child)
 # Neighborhood functions 
 ####################################################################
 
-#All nodes connected to node x
-neighbors(g::PDAG, x) = findall(g.A[:,x] .| g.A[x,:])
+function neighborsGeneral(isFunction::Function, g::PDAG, x)
+    neighborList = Int64[]
+    for vᵢ in vertices(g)
+        #check depends on desired list of neighbors
+        #e.g. isFunction == isParent when searching for vᵢ→x
+        if isFunction(g,vᵢ,x)
+            push!(neighborList,vᵢ)
+        end
+    end
 
-#All nodes with an arrow pointing to node x
-neighbors_in(g::PDAG, x) = findall(@. g.A[:,x] & !g.A[x,:])
+    return neighborList
+end
 
-#All nodes that node x points to
-neighbors_out(g::PDAG, x) = findall(@. g.A[x,:] & !g.A[:,x])
-neighbors_undirect(g::PDAG, x) = findall(g.A[x,:] .& g.A[:,x])
+#All vertices connected to x
+neighbors(g::PDAG, x) = neighborsGeneral(isadjacent, g, x)
 
+#All vertices pointing to x
+neighbors_in(g::PDAG, x) = neighborsGeneral(isparent, g, x)
+
+#All vertices pointing away from x
+neighbors_out(g::PDAG, x) = neighborsGeneral(ischild, g, x)
+
+#All vertices pointing away from x
+neighbors_undirect(g::PDAG, x) = neighborsGeneral(isneighbor, g, x)
 
 #these are just aliases for the functions above
 parents(g::PDAG, x) = neighbors_in(g, x)
 children(g::PDAG, x) = neighbors_out(g, x)
 
+
+####################################################################
+# Counting Functions
+####################################################################
+function countGeneral(isFunction::Function, g::PDAG,x)
+    counter=0
+    for vᵢ in vertices(g)
+        if isFunction(g,vᵢ,x)
+            counter += 1
+        end
+    end
+    return counter
+end
+
+#All vertices connected to x
+countNeighbors(g::PDAG, x) = countGeneral(isadjacent, g, x)
+
+#All vertices pointing to x
+countNeighbors_in(g::PDAG, x) = countGeneral(isparent, g, x)
+
+#All vertices pointing away from x
+countNeighbors_out(g::PDAG, x) = countGeneral(ischild, g, x)
+
+#All vertices pointing away from x
+countNeighbors_undirect(g::PDAG, x) = countGeneral(isneighbor, g, x)
+
+#these are just aliases for the functions above
+countParents(g::PDAG, x) = countNeighbors_in(g, x)
+countChildren(g::PDAG, x) = countNeighbors_out(g, x)
 
 ####################################################################
 # all* functions
@@ -422,5 +470,3 @@ calcNAyx(g::PDAG, edge::Edge) = calcNAyx(g, edge.child, edge.parent)
 calcT(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y), neighbors(g,x), x)
 calcT(g::PDAG, edge::Edge) = calcT(g, edge.child, edge.parent)
 
-#count the number of parents a vertex has
-countParents(g::PDAG, x) = count(g.A[:,x] & !g.A[x,:])
