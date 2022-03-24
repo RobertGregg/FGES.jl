@@ -60,12 +60,11 @@ export
     vertices,
     countParents,
 
+    orientedge!,
     calcNAyx,
 
 #graphAlgorithms.jl
-    PDAGtoCompletePDAG!,
     graphVStructure!,
-    PDAGtoDAG!,
     categorizeNeighbors,
     setCategory!,
     meekRules!,

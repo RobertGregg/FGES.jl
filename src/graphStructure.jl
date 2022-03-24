@@ -254,7 +254,7 @@ function isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
 
     #Create a graph subset where we remove the nodes in nodesRemoved
     if !isnothing(nodesRemoved)
-        nodeSubset = setdiff(vertices(g), nodesRemoved)
+        nodeSubset = filter(x-> x∉nodesRemoved, vertices(g))
         g = view(g, nodeSubset)
         src = searchsortedfirst(nodeSubset,src)
         dest = searchsortedfirst(nodeSubset,dest)
@@ -303,8 +303,15 @@ isdirected(edge::Edge) = edge.directed
 # Add and Remove 
 ####################################################################
 
+"""
+    addedge!(g::PDAG, x, y; directed=true)
+    addedge!(g::PDAG, edge::Edge)
+Add the edge `x`→`y` to the graph `g`.
 
-#Given a graph and two node indices, add an edge between them by updating the adjacency matrix
+Can also perform the same addition given an `edge`.
+
+By default, this function will direct the new edge from `x` to `y` unless the `directed` keyword is changed to `false`.
+"""
 function addedge!(g::PDAG, x, y; directed=true)
     g.A[x,y] = true
     g.A[y,x] = !directed
@@ -314,7 +321,15 @@ end
 #If an edge type if given, call the previous function
 addedge!(g::PDAG, edge::Edge) = addedge!(g::PDAG, edge.parent, edge.child, directed=edge.directed)
 
-#remove edge (two ints)
+"""
+    remedge!(g::PDAG, x, y)
+    remedge!(g::PDAG, edge::Edge)
+Remove any edge between `x` and `y` in the graph `g`.
+
+Can also perform the same deletion given an `edge`.
+
+No warning is given if `edge` is not in the graph.
+"""
 function remedge!(g::PDAG, x, y)
     g.A[x,y] = false
     g.A[y,x] = false
@@ -330,11 +345,13 @@ remedge!(g::PDAG, edge::Edge) = remedge!(g, edge.parent, edge.child)
 # Neighborhood functions 
 ####################################################################
 
+#Loop through all the vertices and perform some neighborhood test on the given vertex
+#Output all vertices that pass the given test
 function neighborsGeneral(isFunction::Function, g::PDAG, x)
     neighborList = Int64[]
     for vᵢ in vertices(g)
         #check depends on desired list of neighbors
-        #e.g. isFunction == isParent when searching for vᵢ→x
+        #e.g. isFunction == isParent when we're searching for vᵢ→x
         if isFunction(g,vᵢ,x)
             push!(neighborList,vᵢ)
         end
@@ -352,7 +369,7 @@ neighbors_in(g::PDAG, x) = neighborsGeneral(isparent, g, x)
 #All vertices pointing away from x
 neighbors_out(g::PDAG, x) = neighborsGeneral(ischild, g, x)
 
-#All vertices pointing away from x
+#All vertices connected to x by an undirected edge
 neighbors_undirect(g::PDAG, x) = neighborsGeneral(isneighbor, g, x)
 
 #these are just aliases for the functions above
@@ -363,6 +380,8 @@ children(g::PDAG, x) = neighbors_out(g, x)
 ####################################################################
 # Counting Functions
 ####################################################################
+
+#Very similar to the neighborsGeneral function except we only keep a count of the valid nodes
 function countGeneral(isFunction::Function, g::PDAG,x)
     counter=0
     for vᵢ in vertices(g)
@@ -382,7 +401,7 @@ countNeighbors_in(g::PDAG, x) = countGeneral(isparent, g, x)
 #All vertices pointing away from x
 countNeighbors_out(g::PDAG, x) = countGeneral(ischild, g, x)
 
-#All vertices pointing away from x
+#All vertices connected to x by an undirected edge
 countNeighbors_undirect(g::PDAG, x) = countGeneral(isneighbor, g, x)
 
 #these are just aliases for the functions above
@@ -423,11 +442,11 @@ function iterate(iterEdge::IterEdge, state=(1,1))
             state = (i,j)
 
             #Check for an edge
-            if g.A[state...] && g.A'[state...] #undirected
+            if g.A[i,j] && g.A'[i,j] #undirected
                 return (Edge(state,false), state)
-            elseif g.A[state...] #forward edge
+            elseif g.A[i,j] #forward edge
                 return (Edge(state,true), state)
-            elseif g.A'[state...] #backward edge
+            elseif g.A'[i,j] #backward edge
                 return (Edge(reverse(state),true), state)
             end
         end
@@ -439,7 +458,7 @@ end
 """
     edges(g::PDAG)
 
-Return an iterator to generate all edges within the graph `g`. 
+Return an iterator to generate all edges within the graph `g`. Use 
 """
 edges(g::PDAG) = IterEdge(g)
 
@@ -456,8 +475,12 @@ vertices(g::PDAG) = Base.OneTo(nv(g))
 # Misc
 ####################################################################
 
-function orientedge(g::PDAG, x::Integer, y::Integer)
-    @assert(isneighbor(g,x,y), "No undirected edged between $x and $y")
+"""
+    orientedge!(g::PDAG, x, y)
+
+Update the edge `x`-`y` to `x`→`y` in the graph `g`. 
+"""
+function orientedge!(g::PDAG, x, y)
     g.A[y,x] = false
     return nothing
 end

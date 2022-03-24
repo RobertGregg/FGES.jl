@@ -97,7 +97,7 @@ function Insert!(g::PDAG, newStep::Step)
     #Orient all edges incident into child node
     y = edge.child
     for t ∈ T
-        orientedge(g,t,y) #t→y
+        orientedge!(g,t,y) #t→y
     end
 
     return nothing
@@ -114,8 +114,8 @@ function Delete!(g::PDAG, newStep::Step)
     #Orient all vertices in H toward x and y
     x,y = edge.parent, edge.child
     for h ∈ H
-        addedge!(g,y,h) #h→y
-        addedge!(g,x,h) #h→x
+        orientedge!(g,x,h) #x→h
+        orientedge!(g,y,h) #y→h
     end
 
     return nothing
@@ -151,8 +151,9 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         operator(g, newStep)
 
         #Covert the PDAG to a complete PDAG
-        #PDAGtoCompletePDAG!(g)
+        #undirect all edges unless they participate in a v-structure
         graphVStructure!(g)
+        #Apply the 4 Meek rules to orient some edges in the graph
         meekRules!(g)
 
         #Reset the score

@@ -23,9 +23,9 @@ g = fges(data)
 
 
 
-# #Save the dataset to run for java
-# df = DataFrame(data, :auto)
-# CSV.write("test/testDatasets/features$(numFeatures)_observations$(numObservations).txt", df ,delim=" ")
+#Save the dataset to run for java
+df = DataFrame(data, :auto)
+CSV.write("test/testDatasets/features$(numFeatures)_observations$(numObservations).txt", df ,delim=" ")
 
 
 # #Run the julia FGES and time it
