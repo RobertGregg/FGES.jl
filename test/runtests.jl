@@ -7,9 +7,11 @@ using Test
 
 
 #Generate a dataset
-numFeatures = 50
+numFeatures = 100
 numObservations = 10000
 data = zeros(numObservations, numFeatures)
+
+
 
 for i in 1:numFeatures
     if i ≤ 2
@@ -19,7 +21,7 @@ for i in 1:numFeatures
     end
 end
 
-g = fges(data)
+g = fges(data, debug=true)
 
 
 

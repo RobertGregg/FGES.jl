@@ -1,18 +1,24 @@
 using FGES
 using CSV, DataFrames
 using Combinatorics
+using Statistics
 
 
 #Generate a dataset
-numFeatures = 50
+numFeatures = 100
 numObservations = 10000
 data = zeros(numObservations, numFeatures)
 
+#number of previous features to use in caluclating the next feature
+n=5
+
 for i in 1:numFeatures
-    if i ≤ 5
+    if i ≤ n
         data[:,i] = randn(numObservations)
     else
-        data[:,i] = sum(rand()*data[:,i-j] for j∈1:5) + randn(numObservations)
+        data[:,i] = sum(rand()*data[:,i-j] for j∈1:n) + randn(numObservations)
+        #Stop the data from exploding
+        data[:,i] ./= mean(data[:,i])
     end
 end
 
@@ -42,8 +48,8 @@ end
 #Generate the true graph
 gTrue = PDAG(numFeatures)
 
-for i=6:numFeatures
-    for j=1:5
+for i=n+1:numFeatures
+    for j=1:n
         addedge!(gTrue,i-j, i)
     end
 end
@@ -90,20 +96,32 @@ function contingencyTableOrient(g,gTrue)
 
     continTable = zeros(Int,2,2)
 
-    for (x,y) in combinations(vertices(gTrue),2)
-        trueAdj = isadjacent(gTrue,x,y)
-        estAdj = isadjacent(g,x,y)
+    for (x,y) in permutations(vertices(gTrue),2)
+        # trueAdj = isadjacent(gTrue,x,y)
+        # estAdj = isadjacent(g,x,y)
 
-        trueUndir = isneighbor(gTrue,x,y)
-        estUndir = isneighbor(g,x,y)
+        # trueDir = isparent(gTrue,x,y)
+        # estDir = isparent(g,x,y)
+        trueDir = Edge(x,y,true) ∈ edges(gTrue)
+        estDir = Edge(x,y,true) ∈ edges(g)
 
-        if (trueAdj & estAdj) & (!trueUndir & !estUndir) #true positive
+        # if (trueAdj & estAdj) & (!trueUndir & !estUndir) #true positive
+        #     continTable[1,1] += 1
+        # elseif (!trueAdj & !estAdj) | (trueUndir & estUndir) #true negative
+        #     continTable[2,2] += 1
+        # elseif (!trueAdj | trueUndir) & (estAdj & !estUndir) #false positive
+        #     continTable[2,1] += 1
+        # else #false negative
+        #     continTable[1,2] += 1
+        # end
+
+        if trueDir & estDir
             continTable[1,1] += 1
-        elseif (!trueAdj & !estAdj) | (trueUndir & estUndir) #true negative
+        elseif !trueDir & !estDir
             continTable[2,2] += 1
-        elseif (!trueAdj | trueUndir) & (estAdj & !estUndir) #false positive
+        elseif !trueDir & estDir
             continTable[2,1] += 1
-        else #false negative
+        else
             continTable[1,2] += 1
         end
     end
