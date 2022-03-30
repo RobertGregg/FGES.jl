@@ -196,6 +196,7 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
     end
 end
 
+
 function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where A
     #Calculate two (possibly empty) sets of nodes
     # NAxy: any nodes that are undirected neighbors of y and connected to x by any edge
@@ -213,7 +214,7 @@ function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     
     #Loop through all possible subsets of Tyx
     for T in powerset(Tyx)
-        if  checkSupersets(T,invalid) && isclique(g, NAyx ∪ T) && isblocked(g, y, x, nodesRemoved = NAyx ∪ T)
+        if  checkSupersets(T,invalid) && isclique(g, NAyx ∪ T) && no_path(g, y, x, NAyx ∪ T)
 
             #Score the valid Insert
             PAy = parents(g,y)

@@ -157,7 +157,7 @@ Test if `x` and `y` are connected by a undirected edge in the graph `g`.
 
 Can also perform the same test given an `edge`.
 """
-isneighbor(g::PDAG, x, y) = g.A[x,y] && g.A[y,x]
+isneighbor(g::PDAG, x, y) = @inbounds g.A[x,y] && g.A[y,x]
 isneighbor(g::PDAG, edge::Edge) = isneighbor(g, edge.parent, edge.child)
 
 
@@ -168,7 +168,7 @@ Test if `x` and `y` are connected by a any edge in the graph `g`.
 
 Can also perform the same test given an `edge`.
 """
-isadjacent(g::PDAG, x, y) = g.A[x,y] || g.A[y,x]
+isadjacent(g::PDAG, x, y) = @inbounds g.A[x,y] || g.A[y,x]
 isadjacent(g::PDAG, edge::Edge) = isadjacent(g, edge.parent, edge.child)
 
 
@@ -179,7 +179,7 @@ Test if `x` is a parent of `y` in the graph `g`.
 
 Can also perform the same test given an `edge`.
 """
-isparent(g::PDAG, x, y) = g.A[x,y] && !g.A[y,x]
+isparent(g::PDAG, x, y) = @inbounds g.A[x,y] && !g.A[y,x]
 isparent(g::PDAG, edge::Edge) = isparent(g, edge.parent, edge.child)
 
 
@@ -190,7 +190,7 @@ Test if `x` is a child of `y` in the graph `g`.
 
 Can also perform the same test given an `edge`.
 """
-ischild(g::PDAG, x, y) = !g.A[x,y] && g.A[y,x]
+ischild(g::PDAG, x, y) = @inbounds !g.A[x,y] && g.A[y,x]
 ischild(g::PDAG, edge::Edge) = ischild(g, edge.parent, edge.child)
 
 """
@@ -280,7 +280,6 @@ function isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
         
         #Get the undirected and outgoing nodes from the current node
         nextNodes = children(g,currentNode) ∪ neighbors_undirect(g,currentNode)
-        
         #Check if destination node was found
         if dest ∈ nextNodes
             return false
@@ -295,6 +294,44 @@ function isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
 
     return true
 end
+
+function no_path(g::PDAG, src, dest, nodesRemoved)
+
+    #Keep track of all the nodes visited
+    visited = zeros(Bool, nv(g))
+
+    # mark excluded vertices as visited
+    for vᵢ in nodesRemoved 
+        visited[vᵢ] = true
+    end
+
+    #If src or dest were in nodesRemoved, the path is blocked
+    (visited[src] || visited[dest]) && return true
+
+    #if the src and dest are the same, path is itself
+    src == dest && return false
+
+    #check if scr or dest have no neighbors
+    if countNeighbors(g, src)==0 || countNeighbors(g, dest)==0
+        return true
+    end
+
+    queue = [src]
+    visited[src] = true
+    while !isempty(queue)
+        currentNode = popfirst!(queue) # get new element from queue
+        for vᵢ in children(g,currentNode) ∪ neighbors_undirect(g,currentNode)
+            vᵢ == dest && return false
+            if !visited[vᵢ]
+                push!(queue, vᵢ) # push onto queue
+                visited[vᵢ] = true
+            end
+        end
+    end
+    return true
+end
+
+
 
 "Return true if `edge` is directed"
 isdirected(edge::Edge) = edge.directed

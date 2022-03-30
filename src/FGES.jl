@@ -34,6 +34,7 @@ export
     isclique,
     isblocked,
     isdirected,
+    no_path,
 
     addedge!,
     remedge!,
