@@ -33,7 +33,7 @@ function PDAG(numNodes::Integer, numEdges::Integer; seed::Int=-1)
 
     #Calculate the maximum number of edges
     maxEdges = numNodes*(numNodes - 1) ÷ 2
-    @assert(numEdges <= maxEdges, "Maximum number of edges for this graph is $maxe")
+    @assert(numEdges <= maxEdges, "Maximum number of edges for this graph is $maxEdges")
 
     #If no random seed is given, use the default RNG
     rng = seed==-1 ? Xoshiro() : Xoshiro(seed);
@@ -529,4 +529,15 @@ calcNAyx(g::PDAG, edge::Edge) = calcNAyx(g, edge.child, edge.parent)
 #for x-y, undirected neighbors of y not connected to x
 calcT(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y), neighbors(g,x), x)
 calcT(g::PDAG, edge::Edge) = calcT(g, edge.child, edge.parent)
+
+function degreeAverage(g::PDAG)
+    
+    ave = 0.0
+
+    for (i,vᵢ) in enumerate(vertices(g))
+        ave += (countNeighbors(g, vᵢ) - ave) / i
+    end
+
+    return ave
+end
 

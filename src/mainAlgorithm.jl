@@ -10,7 +10,7 @@ struct ParseData{M}
     numFeatures::Int #number of columns
     numObservations::Int #number of rows
 
-    function ParseData(data::M) where M 
+    function ParseData(data::M, scatterMat) where M 
 
         #Get the dimensions of the input data
         numObservations, numFeatures = size(data)
@@ -23,7 +23,9 @@ struct ParseData{M}
         #Augment a column of ones on the end for linear regression
         normAugData = [normAugData ones(numObservations)]
 
-        scatterMat = normAugData'normAugData
+        if isnothing(scatterMat)
+            scatterMat = normAugData'normAugData
+        end
 
         return new{M}(data, normAugData, scatterMat, numFeatures, numObservations)
     end
@@ -63,10 +65,10 @@ end
     fges(data; debug=false)
 Compute a causal graph for the given observed data.
 """
-function fges(data; debug=false)
+function fges(data; scatterMat=nothing, debug=false)
 
     #Parse the inputted data
-    dataParsed = ParseData(data)
+    dataParsed = ParseData(data, scatterMat)
 
     #Create an empty graph with one node for each feature
     g = PDAG(dataParsed.numFeatures)
@@ -155,6 +157,9 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         graphVStructure!(g)
         #Apply the 4 Meek rules to orient some edges in the graph
         meekRules!(g)
+
+        displayInfo = throttle(statusUpdate, 600)
+        displayInfo(g, operator == Insert! ? "Forward" : "Backward")
 
         #Reset the score
         newStep.Δscore = zero(A)
@@ -338,4 +343,23 @@ end
 
     #return the final score we want to maximize (which is technically -2BIC)
     return -k*log(n) - n*log(mse)
+end
+
+
+function statusUpdate(g::PDAG, phase)
+
+    numNodes = g.nv
+    maxEdges = numNodes*(numNodes - 1) ÷ 2
+
+    aveDegree = round(degreeAverage(g), sigdigits=3)
+
+    currentTime = Dates.format(now(), dateformat"m/d/yyyy II:MM p")
+
+    println("------------------------")
+    println("Updated at $(currentTime)")
+    println("Phase: $(phase)")
+
+    percentEdges = round(ne(g)/maxEdges, sigdigits=3)
+    println("Edges $(ne(g)) / Total $(maxEdges) ($(percentEdges)%)")
+    println("Average Degree: $(aveDegree)")
 end
