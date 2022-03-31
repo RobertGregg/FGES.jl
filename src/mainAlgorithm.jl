@@ -132,7 +132,7 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
     #Create a container to hold information about the next step
     newStep = Step{Int,A}()
 
-    #Continually add/remove edges to the graph until the score stops increasing 
+    displayInfo = throttle(statusUpdate, 600)
     while true
         
         #Get the new best step (depends on if we're inserting or deleting)
@@ -148,17 +148,17 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
             #...stop searching
             break
         end
-
+        
         #Use the insert or delete operator update the graph
         operator(g, newStep)
-
+        
         #Covert the PDAG to a complete PDAG
         #undirect all edges unless they participate in a v-structure
         graphVStructure!(g)
         #Apply the 4 Meek rules to orient some edges in the graph
         meekRules!(g)
-
-        displayInfo = throttle(statusUpdate, 600)
+        
+        #Continually add/remove edges to the graph until the score stops increasing 
         displayInfo(g, operator == Insert! ? "Forward" : "Backward")
 
         #Reset the score
