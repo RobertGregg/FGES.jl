@@ -541,3 +541,13 @@ function degreeAverage(g::PDAG)
     return ave
 end
 
+####################################################################
+# Save the graph
+####################################################################
+function saveGraph(fileName,g)
+    open(fileName,"a") do io
+        for edge in edges(g)
+            println(io,edge)
+        end
+    end
+end
