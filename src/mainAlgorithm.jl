@@ -1,3 +1,9 @@
+#For running on a server, need to flush out the print calls
+function message(x...)
+    println(x...)
+    flush(stdout)
+end
+
 ####################################################################
 # Data Structures
 ####################################################################
@@ -73,11 +79,11 @@ function fges(data; scatterMat=nothing, debug=false)
     #Create an empty graph with one node for each feature
     g = PDAG(dataParsed.numFeatures)
 
-    debug && printstyled("Start forward search\n"; color=:blue, bold=true)
+    debug && message("Start forward search")
     #Perform the forward search 
     Search!(g, dataParsed, Insert!, debug)
 
-    debug && printstyled("Start backward search\n"; color=:red, bold=true)
+    debug && message("Start backward search")
     #Perform the backward search 
     Search!(g, dataParsed, Delete!, debug)
     
@@ -132,7 +138,10 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
     #Create a container to hold information about the next step
     newStep = Step{Int,A}()
 
-    displayInfo = throttle(statusUpdate, 600)
+    #Throttle the status update to every 10 minutes
+    displayInfo = throttle(statusUpdate, 10*60)
+
+    #Continually add/remove edges to the graph until the score stops increasing
     while true
         
         #Get the new best step (depends on if we're inserting or deleting)
@@ -142,7 +151,7 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
             findNextEquivClass!(newStep, dataParsed, g, findBestDelete, debug)
         end
         
-        debug && printstyled(newStep, "\n"; color=:magenta)
+        debug && message(newStep)
         #If the score did not improve...
         if newStep.Δscore ≤ zero(A)
             #...stop searching
@@ -158,7 +167,7 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         #Apply the 4 Meek rules to orient some edges in the graph
         meekRules!(g)
         
-        #Continually add/remove edges to the graph until the score stops increasing 
+        #So, how's it going?
         displayInfo(g, operator == Insert! ? "Forward" : "Backward")
 
         #Reset the score
@@ -355,11 +364,11 @@ function statusUpdate(g::PDAG, phase)
 
     currentTime = Dates.format(now(), dateformat"m/d/yyyy II:MM p")
 
-    println("------------------------")
-    println("Updated at $(currentTime)")
-    println("Phase: $(phase)")
+    message("------------------------")
+    message("Updated at $(currentTime)")
+    message("Phase: $(phase)")
 
     percentEdges = round(ne(g)/maxEdges, sigdigits=3)
-    println("Edges $(ne(g)) / Total $(maxEdges) ($(percentEdges)%)")
-    println("Average Degree: $(aveDegree)")
+    message("Edges $(ne(g)) / Total $(maxEdges) ($(percentEdges)%)")
+    message("Average Degree: $(aveDegree)")
 end
