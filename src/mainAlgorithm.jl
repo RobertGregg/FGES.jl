@@ -168,7 +168,7 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         meekRules!(g)
         
         #So, how's it going?
-        displayInfo(g, operator == Insert! ? "Forward" : "Backward")
+        debug && displayInfo(g, operator == Insert! ? "Forward" : "Backward")
 
         #Reset the score
         newStep.Δscore = zero(A)
@@ -228,17 +228,20 @@ function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     
     #Loop through all possible subsets of Tyx
     for T in powerset(Tyx)
-        if  checkSupersets(T,invalid) && isclique(g, NAyx ∪ T) && no_path(g, y, x, NAyx ∪ T)
+        if  checkSupersets(T,invalid)
+            NAyxT = NAyx ∪ T
+            if isclique(g, NAyxT) && no_path(g, y, x, NAyxT)
 
-            #Score the valid Insert
-            PAy = parents(g,y)
-            PAy⁺ = PAy ∪ x
-            newScore = score(dataParsed, NAyx ∪ T ∪ PAy⁺, y, debug) - score(dataParsed, NAyx ∪ T ∪ PAy, y, debug)
-            
-            #Save the new score if it was better than any previous
-            if newScore > bestScore
-                bestT = T
-                bestScore = newScore
+                #Score the valid Insert
+                PAy = parents(g,y)
+                PAy⁺ = PAy ∪ x
+                newScore = score(dataParsed, NAyxT ∪ PAy⁺, y, debug) - score(dataParsed, NAyxT ∪ PAy, y, debug)
+                
+                #Save the new score if it was better than any previous
+                if newScore > bestScore
+                    bestT = T
+                    bestScore = newScore
+                end
             end
         else
             #Record that the subset T is invalid

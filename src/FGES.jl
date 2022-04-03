@@ -31,6 +31,7 @@ export
     isadjacent,
     isparent,
     ischild,
+    isdescendent,
     issink,
     issource,
     isclique,
@@ -47,6 +48,7 @@ export
     neighbors_undirect,
     parents,
     children,
+    descendent,
 
     countNeighbors,
     countNeighbors_in,
@@ -61,7 +63,6 @@ export
 
     edges,
     vertices,
-    countParents,
 
     orientedge!,
     calcNAyx,

@@ -193,6 +193,9 @@ Can also perform the same test given an `edge`.
 ischild(g::PDAG, x, y) = @inbounds !g.A[x,y] && g.A[y,x]
 ischild(g::PDAG, edge::Edge) = ischild(g, edge.parent, edge.child)
 
+isdescendent(g::PDAG, x, y) = @inbounds g.A[y,x]
+
+
 """
     issink(g::PDAG, x)
 Test if `x` a sink node in the graph `g` (i.e. there are no arrows pointing out of `x`).
@@ -320,7 +323,7 @@ function no_path(g::PDAG, src, dest, nodesRemoved)
     visited[src] = true
     while !isempty(queue)
         currentNode = popfirst!(queue) # get new element from queue
-        for vᵢ in children(g,currentNode) ∪ neighbors_undirect(g,currentNode)
+        for vᵢ in descendent(g,currentNode)
             vᵢ == dest && return false
             if !visited[vᵢ]
                 push!(queue, vᵢ) # push onto queue
@@ -412,6 +415,8 @@ neighbors_undirect(g::PDAG, x) = neighborsGeneral(isneighbor, g, x)
 #these are just aliases for the functions above
 parents(g::PDAG, x) = neighbors_in(g, x)
 children(g::PDAG, x) = neighbors_out(g, x)
+
+descendent(g::PDAG, x) = neighborsGeneral(isdescendent, g, x)
 
 
 ####################################################################
@@ -523,11 +528,37 @@ function orientedge!(g::PDAG, x, y)
 end
 
 # for x-y, get undirected neighbors of y and any neighbor of x
-calcNAyx(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y) ∩ neighbors(g,x), x)
+#calcNAyx(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y) ∩ neighbors(g,x), x)
+function calcNAyx(g::PDAG, y, x)
+    neighborList = Int64[]
+
+    #loop through all vertices except for x
+    for vᵢ in Iterators.filter(!isequal(x),vertices(g))
+        #look for neighbors of y and adjacencies to x
+        if isneighbor(g,vᵢ,y) && isadjacent(g,vᵢ,x)
+            push!(neighborList,vᵢ)
+        end
+    end
+
+    return neighborList
+end
 calcNAyx(g::PDAG, edge::Edge) = calcNAyx(g, edge.child, edge.parent)
 
 #for x-y, undirected neighbors of y not connected to x
-calcT(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y), neighbors(g,x), x)
+#calcT(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y), neighbors(g,x), x)
+function calcT(g::PDAG, y, x)
+    neighborList = Int64[]
+
+    #loop through all vertices except for x
+    for vᵢ in Iterators.filter(!isequal(x),vertices(g))
+        #look for neighbors of y and adjacencies to x
+        if isneighbor(g,vᵢ,y) && !isadjacent(g,vᵢ,x)
+            push!(neighborList,vᵢ)
+        end
+    end
+
+    return neighborList
+end
 calcT(g::PDAG, edge::Edge) = calcT(g, edge.child, edge.parent)
 
 function degreeAverage(g::PDAG)
