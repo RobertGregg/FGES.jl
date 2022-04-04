@@ -151,7 +151,7 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
             findNextEquivClass!(newStep, dataParsed, g, findBestDelete, debug)
         end
         
-        debug && message(newStep)
+        
         #If the score did not improve...
         if newStep.Δscore ≤ zero(A)
             #...stop searching
@@ -203,6 +203,8 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
                         newStep.edge = Edge(x,y,true)
                         newStep.subset = bestSubset
                         newStep.Δscore = bestScore
+
+                        debug && message(newStep)
                     end
                 end
             end
@@ -302,7 +304,7 @@ end
 # Scoring function
 ####################################################################
 
-@memoize LRU(maxsize=1_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
+@memoize LRU(maxsize=1_000_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
     #debug && println("Parents: $(nodeParents), Child: $(node)")
     #Unpack some variables from the dataParsed structure
     n = A(dataParsed.numObservations) #convert datatype
