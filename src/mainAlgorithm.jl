@@ -138,9 +138,6 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
     #Create a container to hold information about the next step
     newStep = Step{Int,A}()
 
-    #Throttle the status update to every 10 minutes
-    displayInfo = throttle(statusUpdate, 10*60)
-
     #Continually add/remove edges to the graph until the score stops increasing
     while true
         
@@ -166,9 +163,6 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         graphVStructure!(g)
         #Apply the 4 Meek rules to orient some edges in the graph
         meekRules!(g)
-        
-        #So, how's it going?
-        debug && displayInfo(g, operator == Insert! ? "Forward" : "Backward")
 
         #Reset the score
         newStep.Δscore = zero(A)
@@ -230,7 +224,7 @@ function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     
     #Loop through all possible subsets of Tyx
     for T in powerset(Tyx)
-        if  checkSupersets(T,invalid)
+        if checkSupersets(T,invalid)
             NAyxT = NAyx ∪ T
             if isclique(g, NAyxT) && no_path(g, y, x, NAyxT)
 

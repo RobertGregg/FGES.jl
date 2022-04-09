@@ -6,7 +6,6 @@ using Statistics #mean, std
 using Random #set seeds in generation of random graph
 using Combinatorics #loop through combinations and permutations
 using Memoization, LRUCache #Caching scores
-using Flux: throttle #only print function output every x seconds
 using Dates #record the current time
 #using Revise
 
