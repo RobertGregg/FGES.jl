@@ -202,11 +202,6 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
                     end
                 end
 
-                if (Sys.free_memory() / Sys.total_memory() < 0.1)
-                    GC.gc()
-                    sleep(10)
-                end
-
             end
         end
     end
@@ -304,8 +299,8 @@ end
 # Scoring function
 ####################################################################
 
-@memoize LRU(maxsize=1_000_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
-    #debug && println("Parents: $(nodeParents), Child: $(node)")
+@memoize LRU(maxsize=10_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
+    debug && message("Parents: $(nodeParents), Child: $(node)")
     #Unpack some variables from the dataParsed structure
     n = A(dataParsed.numObservations) #convert datatype
     scatterMat = dataParsed.scatterMat
