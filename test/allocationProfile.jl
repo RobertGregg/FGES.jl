@@ -6,7 +6,7 @@ using Random, Statistics
 
 Random.seed!(314)
 #Generate a dataset
-numFeatures = 20
+numFeatures = 100
 numObservations = 1000
 data = zeros(numObservations, numFeatures)
 
@@ -23,4 +23,4 @@ for i in 1:numFeatures
     end
 end
 
-g = fges(data)
+@profview fges(data)

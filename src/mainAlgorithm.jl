@@ -166,6 +166,8 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
 
         #Reset the score
         newStep.Δscore = zero(A)
+
+        
     end
 
     return nothing
@@ -300,7 +302,7 @@ end
 ####################################################################
 
 @memoize LRU(maxsize=10_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
-    debug && message("Parents: $(nodeParents), Child: $(node)")
+    #debug && message("Parents: $(nodeParents), Child: $(node)")
     #Unpack some variables from the dataParsed structure
     n = A(dataParsed.numObservations) #convert datatype
     scatterMat = dataParsed.scatterMat
