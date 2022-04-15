@@ -1,10 +1,10 @@
 # Fast Greedy Equivalence Search (FGES)
 
-Given a set of observational data, this algorithm will construct a directed acyclic graph where nodes represents variables in the data and edges represent causal connections between those variables.
+Given a set of observational data, this algorithm will construct a directed acyclic graph where nodes represent variables in the data and edges represent causal connections between those variables.
 
 ## Installing the package
 
-The package is still undergoing major changes, however it can it tested using 
+The package is still undergoing major changes, however it can be tested using 
 
 ```julia
 pkg> add https://github.com/RobertGregg/FGES.jl.git
@@ -15,18 +15,23 @@ pkg> add https://github.com/RobertGregg/FGES.jl.git
 Given a matrix of data where each column is a variable and each row is an observation:
 
 ```julia
-data = rand(50,50)
+using FGES
+
+numFeatures = 10
+numObservations = 1000
+
+data = rand(numFeatures,numObservations)
 g = fges(data)
 ```
 
-The `fges()` function can also be run in debug mode, where information additional information about the algorithm's progress is printed.
+The `fges()` function can be run in debug mode, where additional information about the algorithm's progress is printed.
 
 ```julia
 data = rand(50,50)
 g = fges(data, debug=true)
 ```
 
-You can also pre-compute a [scatter matrix](https://en.wikipedia.org/wiki/Scatter_matrix) for large systems. This is only recommended if this matrix will not fit into memory and you need to use [memory maps](https://docs.julialang.org/en/v1/stdlib/Mmap/).
+You can also pre-compute a [scatter matrix](https://en.wikipedia.org/wiki/Scatter_matrix) for large systems. This is only recommended if this matrix will not fit into memory and you need to use [memory maps](https://docs.julialang.org/en/v1/stdlib/Mmap/). Data standardization is required.
 
 ```julia
 using Statistics
@@ -54,6 +59,6 @@ g1 = fges(data)
 fileName = "myGraph.txt"
 saveGraph(fileName,g1)
 
-#load hat graph back in
+#load that graph back in
 g2 = loadGraph(fileName)
 ```
