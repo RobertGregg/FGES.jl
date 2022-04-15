@@ -31,12 +31,9 @@ export
     isparent,
     ischild,
     isdescendent,
-    issink,
-    issource,
     isclique,
     isblocked,
     isdirected,
-    no_path,
 
     addedge!,
     remedge!,
@@ -59,13 +56,18 @@ export
     allundirected,
     alldirected,
     alledges,
+    allpairs,
 
     edges,
     vertices,
 
     orientedge!,
     calcNAyx,
+    calcT,
     degreeAverage,
+
+    saveGraph,
+    loadGraph,
 
 #graphAlgorithms.jl
     graphVStructure!,
@@ -80,6 +82,5 @@ export
     Insert!,
     Delete!,
     statusUpdate
-
 
 end

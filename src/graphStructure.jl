@@ -123,6 +123,9 @@ function show(io::IO, edge::Edge)
     end
 end
 
+#check if two graphs are equal by compares adjacency matrices
+==(g₁::PDAG, g₂::PDAG) = g₁.A == g₂.A
+
 ####################################################################
 # Number of Vertices and Edges
 ####################################################################
@@ -193,43 +196,20 @@ Can also perform the same test given an `edge`.
 ischild(g::PDAG, x, y) = @inbounds !g.A[x,y] && g.A[y,x]
 ischild(g::PDAG, edge::Edge) = ischild(g, edge.parent, edge.child)
 
+
+"""
+    isdescendent(g::PDAG, x, y)
+Return `true` if `x`←`y` OR `x`-`y` in the graph `g`.
+"""
 isdescendent(g::PDAG, x, y) = @inbounds g.A[y,x]
-
-
-"""
-    issink(g::PDAG, x)
-Test if `x` a sink node in the graph `g` (i.e. there are no arrows pointing out of `x`).
-"""
-function issink(g::PDAG, x)
-    for y ∈ vertices(g)
-        if isparent(g,x,y)
-            return false
-        end
-    end
-    return true
-end
-
-"""
-    issource(g::PDAG, x)
-Test if `x` a source node in the graph `g` (i.e. there are no arrows pointing into `x`).
-"""
-function issource(g::PDAG, x)
-    for y ∈ vertices(g)
-        if ischild(g,x,y)
-            return false
-        end
-    end
-    return true
-end
-
 
 """
     isclique(g::PDAG, nodes)
 Return `true` if all vertices in `nodes` are connected to each other in the graph `g`.
 """
-function isclique(g::PDAG, nodes::Vector{T}) where T<:Integer
+function isclique(g::PDAG, nodes)
 
-    for (v₁, v₂) in combinations(nodes,2)
+    for (v₁, v₂) in allpairs(nodes)
         if !isadjacent(g, v₁, v₂)
             return false
         end
@@ -241,64 +221,17 @@ end
 
 #Do the nodesRemoved block all semi-directed paths between src and dest?
 """
-    isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
+    isblocked(g::PDAG, src, dest, nodesRemoved)
 Return `true` if there is no semi-directed path between `src` and `dest` in the graph `g`.
 
-Optionally, a set of vertices (`nodesRemoved`) can be removed from the graph before searching for a semi-directed path.
+A set of vertices (`nodesRemoved`) can be removed from the graph before searching for a semi-directed path.
 
 A semi-directed path between `src` and `dest` is a list of edges in `g` where every edge is either undirected or points toward `dest`. 
 
     src → x₁ - x₂ → dest ✓
     src → x₁ ← x₂ - dest ✖
 """
-function isblocked(g::PDAG, src, dest; nodesRemoved=nothing)
-
-    #use breath first search (in hopes that path is short)
-
-    #Create a graph subset where we remove the nodes in nodesRemoved
-    if !isnothing(nodesRemoved)
-        nodeSubset = filter(x-> x∉nodesRemoved, vertices(g))
-        g = view(g, nodeSubset)
-        src = searchsortedfirst(nodeSubset,src)
-        dest = searchsortedfirst(nodeSubset,dest)
-    end
-
-    #first check if scr or dest have no neighbors
-    if countNeighbors(g, src)==0 || countNeighbors(g, dest)==0
-        return true
-    end
-
-    #Keep track of all the nodes visited and a queue of nodes to visit
-    visited = falses(nv(g))
-    queue = [src]
-
-    #loop over all nodes in queue until it is empty
-    while !isempty(queue)
-        #Get the next node from the queue
-        currentNode = popfirst!(queue)
-        
-        #if this edge was already visited from an undirected path, skip it
-        #needed because of undirected edges
-        visited[currentNode] && continue
-        
-        #Get the undirected and outgoing nodes from the current node
-        nextNodes = children(g,currentNode) ∪ neighbors_undirect(g,currentNode)
-        #Check if destination node was found
-        if dest ∈ nextNodes
-            return false
-        end
-        
-        #If not, append the undirected and outgoing nodes to the queue
-        append!(queue, nextNodes)
-        
-        #Mark the node as visited 
-        visited[currentNode] = true
-    end
-
-    return true
-end
-
-function no_path(g::PDAG, src, dest, nodesRemoved)
+function isblocked(g::PDAG, src, dest, nodesRemoved)
 
     #Keep track of all the nodes visited
     visited = zeros(Bool, nv(g))
@@ -335,12 +268,11 @@ function no_path(g::PDAG, src, dest, nodesRemoved)
 end
 
 
-
 "Return true if `edge` is directed"
 isdirected(edge::Edge) = edge.directed
 
 ####################################################################
-# Add and Remove 
+# Modify Edges
 ####################################################################
 
 """
@@ -380,25 +312,38 @@ end
 remedge!(g::PDAG, edge::Edge) = remedge!(g, edge.parent, edge.child)
 
 
+"""
+    orientedge!(g::PDAG, x, y)
+
+Update the edge `x`-`y` to `x`→`y` in the graph `g`. 
+"""
+function orientedge!(g::PDAG, x, y)
+    g.A[y,x] = false
+    return nothing
+end
+
 
 ####################################################################
 # Neighborhood functions 
 ####################################################################
 
+#Should these be non-allocating iterators? 
+neighborsGeneral(isFunction::Function, g::PDAG, x) = Iterators.filter(vᵢ -> isFunction(g,vᵢ,x), vertices(g))
+
 #Loop through all the vertices and perform some neighborhood test on the given vertex
 #Output all vertices that pass the given test
-function neighborsGeneral(isFunction::Function, g::PDAG, x)
-    neighborList = Int64[]
-    for vᵢ in vertices(g)
-        #check depends on desired list of neighbors
-        #e.g. isFunction == isParent when we're searching for vᵢ→x
-        if isFunction(g,vᵢ,x)
-            push!(neighborList,vᵢ)
-        end
-    end
+# function neighborsGeneral(isFunction::Function, g::PDAG, x)
+#     neighborList = Int64[]
+#     for vᵢ in vertices(g)
+#         #check depends on desired list of neighbors
+#         #e.g. isFunction == isParent when we're searching for vᵢ→x
+#         if isFunction(g,vᵢ,x)
+#             push!(neighborList,vᵢ)
+#         end
+#     end
 
-    return neighborList
-end
+#     return neighborList
+# end
 
 #All vertices connected to x
 neighbors(g::PDAG, x) = neighborsGeneral(isadjacent, g, x)
@@ -463,7 +408,10 @@ alldirected(g::PDAG) = [Edge(i,true) for i in CartesianIndices(g.A) if g.A[i] &&
 #combine and sort all directed and undirected edges
 alledges(g::PDAG) = sort([allundirected(g); alldirected(g)], by=x->(x.parent, x.child))
 
-
+#Generate an iterator equivalent to combinations(x,2) but with base packages
+#The combinations are not in order, but that doesn't matter in this case
+#benefit: packages have more methods defined for the base iterators
+allpairs(v) = Iterators.filter(i -> isless(i...), Iterators.product(v,v))
 
 ####################################################################
 # Iterators
@@ -517,16 +465,6 @@ vertices(g::PDAG) = Base.OneTo(nv(g))
 # Misc
 ####################################################################
 
-"""
-    orientedge!(g::PDAG, x, y)
-
-Update the edge `x`-`y` to `x`→`y` in the graph `g`. 
-"""
-function orientedge!(g::PDAG, x, y)
-    g.A[y,x] = false
-    return nothing
-end
-
 # for x-y, get undirected neighbors of y and any neighbor of x
 #calcNAyx(g::PDAG, y::Integer, x::Integer) = setdiff(neighbors_undirect(g,y) ∩ neighbors(g,x), x)
 function calcNAyx(g::PDAG, y, x)
@@ -561,6 +499,7 @@ function calcT(g::PDAG, y, x)
 end
 calcT(g::PDAG, edge::Edge) = calcT(g, edge.child, edge.parent)
 
+#Single pass algoirthm to calculate the average degree
 function degreeAverage(g::PDAG)
     
     ave = 0.0
@@ -573,12 +512,45 @@ function degreeAverage(g::PDAG)
 end
 
 ####################################################################
-# Save the graph
+# Save/load graphs
 ####################################################################
-function saveGraph(fileName,g)
-    open(fileName,"a") do io
+
+"""
+    saveGraph(fileName, g::PDAG)
+
+Save the output of fges to a text file. 
+"""
+function saveGraph(fileName,g::PDAG)
+    open(fileName,"w") do io
         for edge in edges(g)
             println(io,edge)
         end
     end
 end
+
+
+"""
+    loadGraph(fileName, g::PDAG)
+
+Save the output of fges to a text file. 
+"""
+function loadGraph(fileName)
+    #find the largest number in the file
+    numFeatures = maximum([maximum(parse.(Int, split(line," ")[[1,3]])) for line in eachline(fileName)])
+
+    g = PDAG(numFeatures)
+
+    for line in eachline(fileName)
+        sublines = split(line," ")
+
+        v₁ = parse(Int, sublines[1])
+        v₂ = parse(Int, sublines[3])
+        edgeDirected = sublines[2] == "→" ? true : false
+
+        addedge!(g, v₁, v₂, directed=edgeDirected)
+    end
+
+    return g
+end
+
+

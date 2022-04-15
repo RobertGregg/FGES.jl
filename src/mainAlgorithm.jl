@@ -177,7 +177,7 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
     #Parallelization with synced threads (to avoid race conditions)
     @sync begin
         #Loop through all possible node combinations
-        for (x,y) in combinations(vertices(g),2) 
+        for (x,y) in allpairs(vertices(g)) 
             #Spawn a new thread
             Threads.@spawn begin
                 #Check if there is an edge between two vertices
@@ -226,7 +226,7 @@ function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     for T in powerset(Tyx)
         if checkSupersets(T,invalid)
             NAyxT = NAyx ∪ T
-            if isclique(g, NAyxT) && no_path(g, y, x, NAyxT)
+            if isclique(g, NAyxT) && isblocked(g, y, x, NAyxT)
 
                 #Score the valid Insert
                 PAy = parents(g,y)
