@@ -78,9 +78,13 @@ export
 #mainAlgorithm.jl
     fges,
     ParseData,
+    Step,
     Search!,
     Insert!,
     Delete!,
+    findNextEquivClass!,
+    findBestInsert,
+    findBestDelete,
     statusUpdate
 
 end

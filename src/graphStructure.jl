@@ -530,9 +530,9 @@ end
 
 
 """
-    loadGraph(fileName, g::PDAG)
+    loadGraph(fileName)
 
-Save the output of fges to a text file. 
+Load a saved output of fges from a text file. 
 """
 function loadGraph(fileName)
     #find the largest number in the file

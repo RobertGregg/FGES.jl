@@ -201,6 +201,12 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
                         debug && message(newStep)
                     end
                 end
+
+                if (Sys.free_memory() / Sys.total_memory() < 0.1)
+                    GC.gc()
+                    sleep(10)
+                end
+
             end
         end
     end
