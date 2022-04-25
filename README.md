@@ -20,7 +20,7 @@ using FGES
 numFeatures = 10
 numObservations = 1000
 
-data = rand(numFeatures,numObservations)
+data = rand(numObservations, numFeatures)
 g = fges(data)
 ```
 
