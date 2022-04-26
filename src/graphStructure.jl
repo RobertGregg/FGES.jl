@@ -554,3 +554,9 @@ function loadGraph(fileName)
 end
 
 
+####################################################################
+# Convert graph to table
+####################################################################
+
+#Well that was easy, thanks Tables.jl
+edgetable(g::PDAG) = DataFrame(edges(g))

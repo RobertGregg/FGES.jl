@@ -23,4 +23,4 @@ for i in 1:numFeatures
     end
 end
 
-@profview fges(data)
+g = fges(data)
