@@ -46,3 +46,18 @@ end
 
     @test g == gLoaded
 end
+
+
+
+
+@testset "Penality Values" begin
+    fileName = "./test/testDatasets/savedGraph.txt"
+    Random.seed!(314)
+    data = rand(100,100)
+
+    g = fges(data)
+    gpenalty = fges(data,penalty=2)
+
+    @test ne(g) == 230
+    @test ne(gpenalty) == 23
+end

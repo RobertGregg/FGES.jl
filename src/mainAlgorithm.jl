@@ -9,14 +9,18 @@ end
 ####################################################################
 
 #Collection of variables to pass along to different functions in the FGES algorithm.  
-struct ParseData{M}
+struct ParseData{M, F<:AbstractFloat}
     data::M #orginal data
     normAugData::M #standardized by the mean and std of each column, appended with ones column at end
     scatterMat::M # (covariance matrix not scaled by the number of observations) 
     numFeatures::Int #number of columns
     numObservations::Int #number of rows
+    penalty::F
 
-    function ParseData(data::M, scatterMat) where M 
+    function ParseData(data::M, scatterMat, penalty) where M 
+
+        #Determine the data type of the data inputted
+        baseType = eltype(data)
 
         #Get the dimensions of the input data
         numObservations, numFeatures = size(data)
@@ -27,13 +31,17 @@ struct ParseData{M}
         normAugData ./= std(normAugData, dims=1) #divide by standard deviation
 
         #Augment a column of ones on the end for linear regression
-        normAugData = [normAugData ones(numObservations)]
+        normAugData = [normAugData ones(baseType, numObservations)]
 
+        #If no scatter matrix is provided, calculate in construction 
         if isnothing(scatterMat)
             scatterMat = normAugData'normAugData
         end
 
-        return new{M}(data, normAugData, scatterMat, numFeatures, numObservations)
+        #Ensure that the penalty is the same type as the data (e.g. Float32)
+        penalty = baseType(penalty)
+
+        return new{M, baseType}(data, normAugData, scatterMat, numFeatures, numObservations, penalty)
     end
 end  
 
@@ -71,10 +79,10 @@ end
     fges(data; debug=false)
 Compute a causal graph for the given observed data.
 """
-function fges(data; scatterMat=nothing, debug=false)
+function fges(data; penalty = 1.0, scatterMat=nothing, debug=false)
 
     #Parse the inputted data
-    dataParsed = ParseData(data, scatterMat)
+    dataParsed = ParseData(data, scatterMat, penalty)
 
     #Create an empty graph with one node for each feature
     g = PDAG(dataParsed.numFeatures)
@@ -307,6 +315,7 @@ end
     n = A(dataParsed.numObservations) #convert datatype
     scatterMat = dataParsed.scatterMat
     data = dataParsed.normAugData
+    p = dataParsed.penalty
 
     #The last column of dataParsed.normAugData is all ones which is required for a linear regression with an intercept. If there are no node parents, model the child node with just the intercept, else use the parents and the intercept
     if isempty(nodeParents)
@@ -353,7 +362,7 @@ end
     mse = sum(x->x^2, y-ŷ) / n
 
     #return the final score we want to maximize (which is technically -2BIC)
-    return -k*log(n) - n*log(mse)
+    return -p*k*log(n) - n*log(mse)
 end
 
 
