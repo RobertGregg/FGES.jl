@@ -50,6 +50,8 @@ g = fges(data, scatterMat=scatterMat)
 
 Finally, you can use a DataFrame as input and FGES will match column names to node labels
 ```julia
+using DataFrames, Random
+
 Random.seed!(951)
 df = DataFrame(Height=rand(100), Age=rand(100), Weight=rand(100), HeartRate=rand(100))
 g = fges(df)
