@@ -47,7 +47,7 @@ end
 
 #Simple structure to hold the current edge, a subset of neighbors, and a score change
 Base.@kwdef mutable struct Step{A,B}
-    edge::Edge = Edge(1,2,true)
+    edge::Edge = Edge(1,2,"parent","child",true)
     subset::Vector{A} = A[]
     Δscore::B = zero(B)
 end
@@ -86,6 +86,26 @@ function fges(data; penalty = 1.0, scatterMat=nothing, debug=false)
 
     #Create an empty graph with one node for each feature
     g = PDAG(dataParsed.numFeatures)
+
+    debug && message("Start forward search")
+    #Perform the forward search 
+    Search!(g, dataParsed, Insert!, debug)
+
+    debug && message("Start backward search")
+    #Perform the backward search 
+    Search!(g, dataParsed, Delete!, debug)
+    
+    #Return the graph
+    return g
+end
+
+function fges(df::DataFrame; penalty = 1.0, scatterMat=nothing, debug=false)
+
+    #Parse the inputted data
+    dataParsed = ParseData(Matrix(df), scatterMat, penalty)
+    
+    #Create an empty graph with one node for each feature
+    g = PDAG(dataParsed.numFeatures, names(df))
 
     debug && message("Start forward search")
     #Perform the forward search 
@@ -204,7 +224,7 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
                     #If the best valid operator was better than any previously found...
                     if bestScore > newStep.Δscore 
                         #...update newStep
-                        newStep.edge = Edge(x,y,true)
+                        newStep.edge = Edge(x, y, g.nodeNames[x], g.nodeNames[y], true)
                         newStep.subset = bestSubset
                         newStep.Δscore = bestScore
 
@@ -222,8 +242,8 @@ function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     #Calculate two (possibly empty) sets of nodes
     # NAxy: any nodes that are undirected neighbors of y and connected to x by any edge
     # Txy: any subset of the undirected neighbors of y not connected to x
-    Tyx = calcT(g, Edge(x,y,true))
-    NAyx = calcNAyx(g, Edge(x,y,true))
+    Tyx = calcT(g, Edge(x, y, g.nodeNames[x], g.nodeNames[y], true))
+    NAyx = calcNAyx(g, Edge(x, y, g.nodeNames[x], g.nodeNames[y], true))
 
 
     #Ceate two containers to hold the best found score and best subset of Tyx
@@ -274,7 +294,7 @@ function findBestDelete(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where 
     #Calculate two (possibly empty) sets of nodes
     # NAxy: any nodes that are undirected neighbors of y and connected to x by any edge
     # Hyx: any subset of the undirected neighbors of y that are connected to x
-    NAyx = calcNAyx(g, Edge(x,y,true))
+    NAyx = calcNAyx(g, Edge(x, y, g.nodeNames[x], g.nodeNames[y], true))
     Hyx = NAyx
 
     #Ceate two containers to hold the best found score and best subset of Tyx

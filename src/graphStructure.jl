@@ -12,9 +12,10 @@ Define a Partially Directed Acyclic Graph (PDAG).
 
 PDAGs are defined by the number of vertices and a Boolean adjacency matrix
 """
-mutable struct PDAG{S<:AbstractMatrix{Bool}}
+mutable struct PDAG{S<:AbstractMatrix{Bool}, N<:AbstractVector}
     nv::Int #number of vertices
     A::S #adjacency matrix to represent graph
+    nodeNames::N #names of the nodes (for printing edges)
 end
 
 
@@ -22,14 +23,15 @@ end
     PDAG(x::Integer)
 Create an empty graph with `x` vertices.
 """
-PDAG(nv::Integer) = PDAG(nv, falses(nv,nv))
+PDAG(nv::Integer, nodeNames) = PDAG(nv, falses(nv,nv), nodeNames)
+PDAG(nv::Integer) = PDAG(nv, 1:nv) #default node names 1,2,3,...
 
 
 """
     PDAG(numNodes, numEdges; seed=-1)
 Generate a random PDAG with `numNodes` vertices and `numEdges` edges.
 """
-function PDAG(numNodes::Integer, numEdges::Integer; seed::Int=-1)
+function PDAG(numNodes::Integer, numEdges::Integer, nodeNames; seed::Int=-1)
 
     #Calculate the maximum number of edges
     maxEdges = numNodes*(numNodes - 1) ÷ 2
@@ -39,7 +41,7 @@ function PDAG(numNodes::Integer, numEdges::Integer; seed::Int=-1)
     rng = seed==-1 ? Xoshiro() : Xoshiro(seed);
 
     #Generate a empty graph
-    g = PDAG(numNodes)
+    g = PDAG(numNodes, nodeNames)
 
     #Continually add edges until the correct number is reached
     edgesAdded = 0
@@ -59,6 +61,7 @@ function PDAG(numNodes::Integer, numEdges::Integer; seed::Int=-1)
     return g
 end
 
+PDAG(numNodes::Integer, numEdges::Integer; seed::Int=-1) = PDAG(numNodes, numEdges, 1:numNodes; seed)
 
 #------Edges------#
 
@@ -72,15 +75,17 @@ A data type to hold edge information.
 
 It is also possible to convert a `Tuple` or `CartesianIndex` into an Edge.
 """
-struct Edge
+struct Edge{T}
     parent::Int
     child::Int
+    parentName::T
+    childName::T
     directed::Bool
 end
 
 #converting edges from other types
-Edge(idx::Tuple{Int, Int}, directed) = Edge(idx...,directed)
-Edge(idx::CartesianIndex{2}, directed) = Edge(Tuple(idx),directed)
+Edge(idx::Tuple{T, T}, nodeNames::N, directed) where {T,N} = Edge(idx..., nodeNames[collect(idx)]..., directed)
+Edge(idx::CartesianIndex{2}, nodeNames, directed) = Edge(Tuple(idx), nodeNames, directed)
 
 "A data type used to iterate through the edges of the graph"
 struct IterEdge{G<:PDAG}
@@ -100,7 +105,7 @@ view(g::PDAG, nodes) = PDAG(length(nodes), view(g.A, nodes, nodes))
 
 
 #An element of an IterEdge is an Edge (gives functions like collect() information about the element type)
-eltype(::Type{IterEdge{PDAG{T}}}) where T = Edge
+eltype(::Type{IterEdge{PDAG{S,N}}}) where {S,N} = Edge{eltype(N)}
 
 
 #knowing the number of edges will allow us to pre-allocate a correctly sized collection of edges
@@ -117,9 +122,9 @@ end
 #overload to print Edge type
 function show(io::IO, edge::Edge)
     if edge.directed
-        print(io,"$(edge.parent) → $(edge.child)")
+        print(io,"$(edge.parentName) → $(edge.childName)")
     else
-        print(io,"$(edge.parent) - $(edge.child)")
+        print(io,"$(edge.parentName) - $(edge.childName)")
     end
 end
 
@@ -400,10 +405,10 @@ countChildren(g::PDAG, x) = countNeighbors_out(g, x)
 ####################################################################
 
 #Get every undirected edge in the entire graph g
-allundirected(g::PDAG) = Edge.(findall(tril(g.A .& g.A')),false)
+allundirected(g::PDAG) = Edge.(findall(tril(g.A .& g.A')), Ref(g.nodeNames), false)
 
 #Get every directed edge in the entire graph g
-alldirected(g::PDAG) = [Edge(i,true) for i in CartesianIndices(g.A) if g.A[i] && !g.A'[i]]
+alldirected(g::PDAG) = [Edge(i, g.nodeNames, true) for i in CartesianIndices(g.A) if g.A[i] && !g.A'[i]]
 
 #combine and sort all directed and undirected edges
 alledges(g::PDAG) = sort([allundirected(g); alldirected(g)], by=x->(x.parent, x.child))
@@ -433,11 +438,11 @@ function iterate(iterEdge::IterEdge, state=(1,1))
 
             #Check for an edge
             if g.A[i,j] && g.A'[i,j] #undirected
-                return (Edge(state,false), state)
+                return (Edge(state, g.nodeNames, false), state)
             elseif g.A[i,j] #forward edge
-                return (Edge(state,true), state)
+                return (Edge(state, g.nodeNames, true), state)
             elseif g.A'[i,j] #backward edge
-                return (Edge(reverse(state),true), state)
+                return (Edge(reverse(state), g.nodeNames, true), state)
             end
         end
     end

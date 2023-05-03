@@ -2,7 +2,7 @@ using Revise
 using FGES
 using Test
 using Random, Statistics
-
+using DataFrames
 
 
 
@@ -60,4 +60,22 @@ end
 
     @test ne(g) == 230
     @test ne(gpenalty) == 23
+end
+
+
+@testset "DataFrames Test" begin
+    Random.seed!(314)
+
+    data = rand(100,20)
+
+    g1 = fges(data)
+    g2 = fges(DataFrame(data,:auto))
+
+    @test ne(g1) == ne(g2)
+
+    @test eltype(edges(g1)) == Edge{Int64}
+    @test eltype(alledges(g1)) == Edge{Int64}
+
+    @test eltype(edges(g2)) == Edge{String}
+    @test eltype(alledges(g2)) == Edge{String}
 end
