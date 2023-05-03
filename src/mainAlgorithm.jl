@@ -9,18 +9,16 @@ end
 ####################################################################
 
 #Collection of variables to pass along to different functions in the FGES algorithm.  
-struct ParseData{M, F<:AbstractFloat}
-    data::M #orginal data
-    normAugData::M #standardized by the mean and std of each column, appended with ones column at end
-    scatterMat::M # (covariance matrix not scaled by the number of observations) 
+struct ParseData{F<:AbstractFloat}
+    data::Matrix{F} #orginal data
+    normAugData::Matrix{F} #standardized by the mean and std of each column, appended with ones column at end
+    scatterMat::Matrix{F} # (covariance matrix not scaled by the number of observations) 
     numFeatures::Int #number of columns
     numObservations::Int #number of rows
+    ŷ::Vector{F}
     penalty::F
 
-    function ParseData(data::M, scatterMat, penalty) where M 
-
-        #Determine the data type of the data inputted
-        baseType = eltype(data)
+    function ParseData(data::Matrix{F}, scatterMat, penalty::F) where F<:AbstractFloat 
 
         #Get the dimensions of the input data
         numObservations, numFeatures = size(data)
@@ -31,17 +29,16 @@ struct ParseData{M, F<:AbstractFloat}
         normAugData ./= std(normAugData, dims=1) #divide by standard deviation
 
         #Augment a column of ones on the end for linear regression
-        normAugData = [normAugData ones(baseType, numObservations)]
+        normAugData = [normAugData ones(F, numObservations)]
 
         #If no scatter matrix is provided, calculate in construction 
         if isnothing(scatterMat)
             scatterMat = normAugData'normAugData
         end
 
-        #Ensure that the penalty is the same type as the data (e.g. Float32)
-        penalty = baseType(penalty)
+        ŷ = zeros(F,numObservations)
 
-        return new{M, baseType}(data, normAugData, scatterMat, numFeatures, numObservations, penalty)
+        return new{F}(data, normAugData, scatterMat, numFeatures, numObservations, ŷ, penalty)
     end
 end  
 
@@ -58,8 +55,8 @@ end
 ####################################################################
 
 #Print method to display the parsed data
-function show(io::IO, d::ParseData{T}) where T
-    print(io, "$(d.numObservations)×$(d.numFeatures) ParseData{$(T)}")
+function show(io::IO, d::ParseData)
+    print(io, "$(d.numObservations)×$(d.numFeatures) $(typeof(d))")
 end
 
 #Print method to display the Step
@@ -141,7 +138,7 @@ end
 # Forward and Backward search
 ####################################################################
 
-function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
+function Search!(g, dataParsed::ParseData{A}, operator, debug) where A
 
     #Create a container to hold information about the next step
     newStep = Step{Int,A}()
@@ -155,7 +152,8 @@ function Search!(g, dataParsed::ParseData{Matrix{A}}, operator, debug) where A
         else
             findNextEquivClass!(newStep, dataParsed, g, findBestDelete, debug)
         end
-        
+
+        debug && statusUpdate(g)
         
         #If the score did not improve...
         if newStep.Δscore ≤ zero(A)
@@ -207,8 +205,6 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
                         newStep.edge = Edge(x,y,true)
                         newStep.subset = bestSubset
                         newStep.Δscore = bestScore
-
-                        debug && message(newStep)
                     end
                 end
 
@@ -218,7 +214,7 @@ function findNextEquivClass!(newStep, dataParsed, g, findBestOperation::Function
 end
 
 
-function findBestInsert(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where A
+function findBestInsert(dataParsed::ParseData{A}, g, x, y, debug) where A
     #Calculate two (possibly empty) sets of nodes
     # NAxy: any nodes that are undirected neighbors of y and connected to x by any edge
     # Txy: any subset of the undirected neighbors of y not connected to x
@@ -270,7 +266,7 @@ function checkSupersets(T,invalid)
 end
 
 
-function findBestDelete(dataParsed::ParseData{Matrix{A}}, g, x, y, debug) where A
+function findBestDelete(dataParsed::ParseData{A}, g, x, y, debug) where A
     #Calculate two (possibly empty) sets of nodes
     # NAxy: any nodes that are undirected neighbors of y and connected to x by any edge
     # Hyx: any subset of the undirected neighbors of y that are connected to x
@@ -309,48 +305,57 @@ end
 # Scoring function
 ####################################################################
 
-@memoize LRU(maxsize=10_000_000) function score(dataParsed::ParseData{Matrix{A}}, nodeParents, node, debug) where A
-    #debug && message("Parents: $(nodeParents), Child: $(node)")
+#@memoize LRU(maxsize=10_000_000) 
+@memoize LRU(maxsize=10_000_000) function score(dataParsed, nodeParents, node, debug)
+
     #Unpack some variables from the dataParsed structure
-    n = A(dataParsed.numObservations) #convert datatype
-    scatterMat = dataParsed.scatterMat
-    data = dataParsed.normAugData
+    n = dataParsed.numObservations #convert datatype
+    data = dataParsed.data
     p = dataParsed.penalty
-
-    #The last column of dataParsed.normAugData is all ones which is required for a linear regression with an intercept. If there are no node parents, model the child node with just the intercept, else use the parents and the intercept
-    if isempty(nodeParents)
-        parentsAndIncept = [dataParsed.numFeatures+1]
-    else
-        parentsAndIncept = [nodeParents; dataParsed.numFeatures+1]
-    end
-
-    #To calculate the score we need a mean-squared error which we can get by regessing the the child node onto the parents
-    #Create variables for a linear regression y = X*b
+    #scatterMat = dataParsed.scatterMat
+    ŷ = dataParsed.ŷ
 
     #Use views to avoid creating copies of the data in memory
         # X is the design matrix, augmented with a column of ones at the end
         # X is also been standardized so mean(columns)=0 and std(column)=1
         # y is data from the child node being tested
-        # We're using the "normal equation" approach to calculate the linear regression
-        # Instead of X\y we use (XᵀX)\(Xᵀy) which is slightly less accurate but in general twice as fast
-        # XᵀX is precomputed in the scatter matrix so we need only to take slices it
     @views begin
-        Xᵀy = scatterMat[parentsAndIncept,node]
-
-        XᵀX = scatterMat[parentsAndIncept,parentsAndIncept]
-
         y = data[:,node]
-        X = data[:,parentsAndIncept]
+        X = data[:,nodeParents]
     end
 
-    #Perform a linear regression
-    b = XᵀX \ Xᵀy
+    #Some small cases to check for better performance
+    if isempty(nodeParents)
+        ŷ .= mean(y)
+    elseif length(nodeParents) == 1
+        β₁, β₀ = simpleRegression(X,y)
+        @. ŷ = β₁*X + β₀
+    else
+        #parentsAndIncept = [nodeParents; dataParsed.numFeatures+1]
+        #X1 = view(data, :, parentsAndIncept)
+        X1 = [X ones(n)]
+        b = X1\y
+        ŷ .= X1*b
+    end
 
-    #I think the above is still using pivoted QR factorization, but to truly use cholesky decomposition I would have to use cholesky(Hermitian(XᵀX)). However, cholesky(⋅) doesn't have a method for SubArrays and not using a view is more costly.
-    #Anyways, maybe this could be solved with LinearSolver.jl
+    # if isempty(nodeParents)
+    #     parentsAndIncept = [dataParsed.numFeatures+1]
+    # else
+    #     parentsAndIncept = [nodeParents; dataParsed.numFeatures+1]
+    # end
 
-    #Get the estimation
-    ŷ = X*b
+    # @views begin
+    #     Xᵀy = scatterMat[parentsAndIncept,node]
+
+    #     XᵀX = scatterMat[parentsAndIncept,parentsAndIncept]
+
+    #     y = data[:,node]
+    #     X = data[:,parentsAndIncept]
+    # end
+
+    # b = X \ y
+    # ŷ = X*b
+
 
     #Next we want to calculate the log likelihood that these are the parents of our node
     # score = log(P(data|Model)) ≈ -BIC/2
@@ -358,15 +363,36 @@ end
     # when P(⋅) is Guassian, log(P(data|Model)) takes the form:
     # -k⋅log(n) - n⋅log(mse)
     # k is the number of free parameters and mse is mean squared error
-    k = length(parentsAndIncept) #includes the intercept
-    mse = sum(x->x^2, y-ŷ) / n
+    k = length(nodeParents)+1 #includes the intercept
+    mse = sum( (yᵢ-ŷᵢ)^2 for (yᵢ,ŷᵢ) in zip(y,ŷ) ) / n
 
     #return the final score we want to maximize (which is technically -2BIC)
     return -p*k*log(n) - n*log(mse)
 end
 
 
-function statusUpdate(g::PDAG, phase)
+function simpleRegression(X,y)
+
+    X̄ = mean(X)
+    ȳ = mean(y)
+
+    varX = 0.0
+    covXy = 0.0
+
+    for (Xᵢ, yᵢ) in zip(X,y)
+        covXy += (Xᵢ-X̄)*(yᵢ-ȳ)
+        varX += (Xᵢ-X̄)^2
+    end
+
+    β₁ = covXy/varX
+    β₀ = ȳ - β₁*X̄
+    
+    return β₁, β₀
+end
+
+
+
+function statusUpdate(g::PDAG)
 
     numNodes = g.nv
     maxEdges = numNodes*(numNodes - 1) ÷ 2
@@ -377,7 +403,6 @@ function statusUpdate(g::PDAG, phase)
 
     message("------------------------")
     message("Updated at $(currentTime)")
-    message("Phase: $(phase)")
 
     percentEdges = round(ne(g)/maxEdges, sigdigits=3)
     message("Edges $(ne(g)) / Total $(maxEdges) ($(percentEdges)%)")

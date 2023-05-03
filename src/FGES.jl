@@ -86,6 +86,7 @@ export
     findNextEquivClass!,
     findBestInsert,
     findBestDelete,
+    score,
     statusUpdate
 
 end

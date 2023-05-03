@@ -22,6 +22,9 @@ for i in 1:numFeatures
     end
 end
 
+#Alternatively read the data in
+data = CSV.read("./test/testDatasets/features100_observations10000.txt",Tables.matrix)
+
 #Run the julia version of FGES and time it
 gJulia = @time fges(data)
 
