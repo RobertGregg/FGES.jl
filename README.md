@@ -48,6 +48,19 @@ scatterMat = normAugData * normAugData'
 g = fges(data, scatterMat=scatterMat)
 ```
 
+Finally, you can use a DataFrame as input and FGES will match column names to node labels
+```julia
+Random.seed!(951)
+df = DataFrame(Height=rand(100), Age=rand(100), Weight=rand(100), HeartRate=rand(100))
+g = fges(df)
+
+collect(edges(g))
+    3-element Vector{Edge{String}}:
+    Height → Age
+    Height - Weight
+    HeartRate → Age
+```
+
 ## Saving the Graph
 
 The graph can saved as a text file using the following function:
@@ -61,4 +74,34 @@ saveGraph(fileName,g1)
 
 #load that graph back in
 g2 = loadGraph(fileName)
+```
+
+## Interfacing with R
+
+This package can be used in R by connecting through Julia. This can be useful if you depend on packages exclusive to R. Note that you are still required to download Julia and the FGES package. 
+
+```R
+#Library to connect julia and R
+library(JuliaConnectoR)
+
+#Load the FGES package in from julia
+FGES <- juliaImport("FGES")
+
+#Create a random data matrix in R
+m <- matrix(runif(10000*100) , ncol = 100)
+
+#Run the fges algorithm in R from Julia
+g <- FGES$fges(m)
+
+#Display the edges found by fges
+FGES$alledges(g)
+
+#Save the graph as a text file
+FGES$saveGraph("myGraph.txt", g)
+
+#Load the graph from a text file
+gload <- FGES$loadGraph("myGraph.txt")
+
+#Convert the edge list to an R dataframe
+df <- as.data.frame(FGES$edgetable(g))
 ```

@@ -34,24 +34,32 @@ end
 
 
 @testset "Save/Load Graph" begin
-    fileName = "./test/testDatasets/savedGraph.txt"
+    fileName1 = "./test/testDatasets/savedGraph1.txt"
+    fileName2 = "./test/testDatasets/savedGraph2.txt"
     Random.seed!(314)
     data = rand(100,100)
 
-    g = fges(data)
+    #Testing raw data
+    g1 = fges(data)
 
-    saveGraph(fileName,g)
+    saveGraph(fileName1,g1)
 
-    gLoaded = loadGraph(fileName)
+    g1Loaded = loadGraph(fileName1)
 
-    @test g == gLoaded
+    @test g1 == g1Loaded
+
+    #Testing DataFrames as well
+    g2 = fges(DataFrame(data,:auto))
+
+    saveGraph(fileName2,g2)
+
+    g2Loaded = loadGraph(fileName2)
+
+    @test g2 == g2Loaded
 end
 
 
-
-
 @testset "Penality Values" begin
-    fileName = "./test/testDatasets/savedGraph.txt"
     Random.seed!(314)
     data = rand(100,100)
 
