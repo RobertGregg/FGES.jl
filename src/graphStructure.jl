@@ -1,6 +1,50 @@
 #Using a directed graph that tracks forward and reverse edges from Graphs.jl
 
 ####################################################################
+# Custom Edges
+####################################################################
+
+#The Graphs.jl edges() function outputs 1→2 and 2→1 if edge is undirected
+#Here we're making a new iterator to avoid that
+
+#This type is not used in the main algorithm, but is for IO
+
+"""
+    Edge(parent, child, directed::Bool)
+    Edge(Tuple(parent,child), directed::Bool)
+    Edge(CartesianIndex(parent,child), directed::Bool)
+A data type to hold edge information.
+
+It is also possible to convert a `Tuple` into an Edge.
+"""
+struct GraphEdge
+    parent::Int
+    child::Int
+    directed::Bool
+end
+
+
+"A data type used to iterate through the edges of the graph"
+struct IterEdge{G<:Graphs.AbstractGraph}
+    g::G 
+end
+
+#(Remove the double counted edges)
+Base.length(iterEdge::IterEdge) = ne(iterEdge.g) - (mapreduce(x->!isoriented(iterEdge.g,x), +, edges(iterEdge.g)) ÷ 2)
+
+Base.eltype(::Type{IterEdge{T}}) where T = GraphEdge
+
+#overload to print Edge type
+function Base.show(io::IO, edge::GraphEdge)
+    if edge.directed
+        print(io,"$(edge.parent) → $(edge.child)")
+    else
+        print(io,"$(edge.parent) - $(edge.child)")
+    end
+end
+
+
+####################################################################
 # Iterators
 ####################################################################
 
@@ -10,6 +54,56 @@ Iterate through all pairs of items in `v`
 """
 allpairs(v) = Iterators.filter(i -> isless(i...), Iterators.product(v,v))
 
+
+#Given an initial (i,j) index, output the next non-zero index in adjacency matrix
+function Base.iterate(iterEdge::IterEdge, state=(1,0))
+    g = iterEdge.g
+    (src, i) = state
+    
+    #Get the next edge skipping out unidrected edges
+    while src ≤ nv(g)
+        
+        adjacencies = g.fadjlist[src]
+
+        #If there are no adjacencies, go to next vertex
+        if isempty(adjacencies)
+            src += 1
+            continue
+        end
+
+        #Increment to the next state
+        if i ≥ length(adjacencies)
+            i = 0
+            src += 1
+            continue
+        else
+            i += 1
+        end
+
+        dst = adjacencies[i]
+
+        
+        #We know src→dst, now check if dst→src
+        undirectedEdge = insorted(src, g.fadjlist[dst])
+
+
+        #Check if edge was already found
+        if src > dst && undirectedEdge
+            continue
+        end
+        
+        return (GraphEdge(src, dst, !undirectedEdge), (src,i))
+    end
+    
+    return nothing
+end
+
+"""
+    alledges(g)
+
+Return an iterator to generate all edges within the graph `g`. Similar to `Graphs.edges()` but does not double count undirected edges
+"""
+alledges(g) = IterEdge(g)
 
 ####################################################################
 # Relationship between two verticies

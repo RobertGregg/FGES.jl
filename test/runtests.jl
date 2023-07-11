@@ -50,9 +50,9 @@ end
     @test g1 == g1Loaded
 
     #Testing DataFrames as well
-    g2 = fges(DataFrame(data,:auto))
+    g2, state2 = fges(DataFrame(data,:auto); returnState=true)
 
-    saveGraph(fileName2,g2)
+    saveGraph(fileName2, g2, state2.featureNames)
 
     g2Loaded, featureNames = loadGraph(fileName2)
 
@@ -81,5 +81,4 @@ end
     g2 = fges(DataFrame(data,:auto))
 
     @test ne(g1) == ne(g2)
-
 end

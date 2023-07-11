@@ -12,7 +12,7 @@ FGES <- juliaImport("FGES")
 m <- matrix(runif(10000*100) , ncol = 100)
 
 #Run the fges algorithm in R from Julia
-g <- FGES$fges(m)
+g <- FGES$fges(m, verbose=TRUE)
 
 #Display the edges found by fges
 FGES$alledges(g)
@@ -24,7 +24,7 @@ FGES$saveGraph("myGraph.txt", g)
 gload <- FGES$loadGraph("myGraph.txt")
 
 #Convert the edge list to an R dataframe
-df <- as.data.frame(FGES$edgetable(gload))
+df <- as.data.frame(FGES$edgetable(gload[[1]]))
 
 ##################################
 #Example 2: Dataframes

@@ -3,7 +3,7 @@
 ####################################################################
 
 """
-    saveGraph(fileName, g)
+    saveGraph(fileName, g,featureNames)
 
 Save the output of fges to a text file. 
 """
@@ -16,23 +16,8 @@ function saveGraph(fileName, g, featureNames)
 
         println(io,"")
 
-        doubleCountedEdges = Vector{Tuple{Int64, Int64}}()
-
-        for edge in edges(g)
-            
-            x, y = edge.src, edge.dst
-
-            if (y,x) ∈ doubleCountedEdges
-                continue
-            end
-
-            if isoriented(g, edge)
-                println(io,"$x → $y")
-            else
-                println(io,"$x - $y")
-                push!(doubleCountedEdges,(x, y))
-            end
-
+        for edge in alledges(g)
+            println(io,edge)
         end
 
     end
@@ -44,7 +29,7 @@ saveGraph(fileName, g) = saveGraph(fileName, g, vertices(g))
 """
     loadGraph(fileName)
 
-Load a saved output of fges from a text file. 
+Load a saved output of fges from a text file. Outputs both the graph and a list of feature names.
 """
 function loadGraph(fileName)
 
@@ -83,13 +68,10 @@ function loadGraph(fileName)
             continue
         end
 
-        if isnothing(parseOutput)
-            v₁ = findfirst(isequal(sublines[1]), nodeNames)
-            v₂ = findfirst(isequal(sublines[3]), nodeNames)
-        else
-            v₁ = parse(Int,sublines[1])
-            v₂ = parse(Int,sublines[3])
-        end
+
+        v₁ = parse(Int,sublines[1])
+        v₂ = parse(Int,sublines[3])
+
         
         add_edge!(g, v₁, v₂)
 
@@ -106,5 +88,18 @@ end
 # Convert graph to table
 ####################################################################
 
-#Well that was easy, thanks Tables.jl
-edgetable(g::T) where T<:Graphs.AbstractGraph = DataFrame(edges(g))
+edgetable(g::T) where T<:Graphs.AbstractGraph = DataFrame(alledges(g))
+
+
+function edgetable(g::T, featureNames) where T<:Graphs.AbstractGraph
+    
+    df = DataFrame(alledges(g))
+    
+    df.parent = featureNames[df.parent]
+    df.child = featureNames[df.child]
+    
+    return df
+end
+
+#Easier syntax for R interface when tuple is used
+edgetable(g_featureNames) = edgetable(g_featureNames...)

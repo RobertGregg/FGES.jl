@@ -97,10 +97,6 @@ modelPrecision(continTableJava)
 modelRecall(continTableJava)
 
 
-
-
-
-
 #Hamming distance
 sum(abs,adjacency_matrix(gJulia) .- adjacency_matrix(gTrue))
 sum(abs,adjacency_matrix(gJava) .- adjacency_matrix(gTrue))

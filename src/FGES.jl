@@ -20,6 +20,7 @@ export
 
 #graphStructure.jl
     allpairs,
+    alledges,
     isadjacent,
     isneighbor,
     isparent,
