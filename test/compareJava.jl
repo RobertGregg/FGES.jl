@@ -1,8 +1,11 @@
-using FGES
+# using FGES
+using Statistics, Random
 using CSV, DataFrames
 using Combinatorics
-using Statistics
+using Graphs
+using FGES
 
+Random.seed!(3)
 
 #Generate a dataset
 numFeatures = 100
@@ -23,7 +26,7 @@ for i in 1:numFeatures
 end
 
 #Run the julia version of FGES and time it
-gJulia = @time fges(data)
+gJulia = @time fges(data; verbose=true)
 
 
 #Save the dataset to run for java
@@ -32,8 +35,8 @@ CSV.write("test/testDatasets/features$(numFeatures)_observations$(numObservation
 
 
 #Read and parse the java results
-gJava = PDAG(numFeatures)
-javaFilepath = "test/testDatasets/features$(numFeatures)_observations$(numObservations)_java.txt"
+gJava = SimpleDiGraph(numFeatures)
+javaFilepath = "test/testDatasets/features$(numFeatures)_observations$(numObservations)_out.txt"
 
 javaResult = filter(line -> occursin(r"x\d+ \D{3} x\d+",line),readlines(open(javaFilepath)))
 javaResult = split.(javaResult," ")
@@ -41,16 +44,20 @@ javaResult = split.(javaResult," ")
 javaEdges = [parse.(Int, filter.(isdigit, line[[2,4]])) for line in javaResult]
 
 for (i,edge) in enumerate(javaEdges)
-    addedge!(gJava,edge...,directed=javaResult[i][3]=="-->" ? true : false) #not worried about orientation for now
+    add_edge!(gJava,edge...)
+
+    if javaResult[i][3] ≠ "-->"
+        add_edge!(gJava,reverse(edge)...)
+    end
 end
 
 
 #Generate the true graph
-gTrue = PDAG(numFeatures)
+gTrue = SimpleDiGraph(numFeatures)
 
 for i=n+1:numFeatures
     for j=1:n
-        addedge!(gTrue,i-j, i)
+        add_edge!(gTrue,i-j, i)
     end
 end
 
@@ -59,7 +66,7 @@ function contingencyTable(g,gTrue)
 
     continTable = zeros(Int,2,2)
 
-    for (x,y) in combinations(vertices(gTrue),2)
+    for (x,y) in allpairs(vertices(gTrue))
         trueEdge = isadjacent(gTrue,x,y)
         estEdge = isadjacent(g,x,y)
 
@@ -91,48 +98,9 @@ modelRecall(continTableJava)
 
 
 
-#Calculate precision and recall
-function contingencyTableOrient(g,gTrue)
 
-    continTable = zeros(Int,2,2)
 
-    for (x,y) in permutations(vertices(gTrue),2)
-        # trueAdj = isadjacent(gTrue,x,y)
-        # estAdj = isadjacent(g,x,y)
 
-        # trueDir = isparent(gTrue,x,y)
-        # estDir = isparent(g,x,y)
-        trueDir = Edge(x,y,true) ∈ edges(gTrue)
-        estDir = Edge(x,y,true) ∈ edges(g)
-
-        # if (trueAdj & estAdj) & (!trueUndir & !estUndir) #true positive
-        #     continTable[1,1] += 1
-        # elseif (!trueAdj & !estAdj) | (trueUndir & estUndir) #true negative
-        #     continTable[2,2] += 1
-        # elseif (!trueAdj | trueUndir) & (estAdj & !estUndir) #false positive
-        #     continTable[2,1] += 1
-        # else #false negative
-        #     continTable[1,2] += 1
-        # end
-
-        if trueDir & estDir
-            continTable[1,1] += 1
-        elseif !trueDir & !estDir
-            continTable[2,2] += 1
-        elseif !trueDir & estDir
-            continTable[2,1] += 1
-        else
-            continTable[1,2] += 1
-        end
-    end
-
-    return continTable
-end
-
-continTableJulia = contingencyTableOrient(gJulia,gTrue)
-modelPrecision(continTableJulia)
-modelRecall(continTableJulia)
-
-continTableJava = contingencyTableOrient(gJava,gTrue)
-modelPrecision(continTableJava)
-modelRecall(continTableJava)
+#Hamming distance
+sum(abs,adjacency_matrix(gJulia) .- adjacency_matrix(gTrue))
+sum(abs,adjacency_matrix(gJava) .- adjacency_matrix(gTrue))

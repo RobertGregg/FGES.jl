@@ -1,0 +1,1 @@
+java -jar causal-cmd-1.9.0-jar-with-dependencies.jar --dataset features100_observations10000.txt --algorithm FGES --delimiter space --data-type continuous --score sem-bic-score -prefix features100_observations10000 --penaltyDiscount 1.0  --verbose Yes
