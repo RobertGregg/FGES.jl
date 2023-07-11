@@ -2,73 +2,42 @@ module FGES
     
 #Packages + Reason required
 using LinearAlgebra #for subarrays (?)
-using Statistics #mean, std
-using Random #set seeds in generation of random graph
+using Statistics #mean
+using Graphs #FGES works on DAGs
 using Combinatorics #loop through combinations and permutations
-using Memoization, LRUCache #Caching scores
+using LRUCache #Caching scores
 using Dates #record the current time
-using DataFrames
+using DataFrames #To allow dataframe inputs to fges
 
-#Base functions to overload
-import Base: show, view, iterate, eltype, length, == #functions from base to extend
 
 #Files to include
 include("graphStructure.jl")
 include("graphAlgorithms.jl")
 include("mainAlgorithm.jl")
+include("graphIO.jl")
 
 export 
 
 #graphStructure.jl
-    PDAG,
-    Edge,
-
-    nv,
-    ne,
-
-    isneighbor,
+    allpairs,
     isadjacent,
+    isneighbor,
     isparent,
     ischild,
     isdescendent,
+    isoriented,
     isclique,
-    isblocked,
-    isdirected,
-
-    addedge!,
-    remedge!,
 
     neighbors,
-    neighbors_in,
-    neighbors_out,
-    neighbors_undirect,
     parents,
     children,
-    descendent,
+    descendents,
+    ancestors,
 
-    countNeighbors,
-    countNeighbors_in,
-    countNeighbors_out,
-    countNeighbors_undirect,
-    countParents,
-    countChildren,
-
-    allundirected,
-    alldirected,
-    alledges,
-    allpairs,
-
-    edges,
-    vertices,
-
+    isblocked,
     orientedge!,
-    calcNAyx,
-    calcT,
-    degreeAverage,
-
-    saveGraph,
-    loadGraph,
-    edgetable,
+    calculateNAyx,
+    calculateTyx,
 
 #graphAlgorithms.jl
     graphVStructure!,
@@ -77,15 +46,21 @@ export
     meekRules!,
 
 #mainAlgorithm.jl
+    CurrentState,
     fges,
-    ParseData,
-    Step,
-    Search!,
     Insert!,
     Delete!,
-    findNextEquivClass!,
-    findBestInsert,
-    findBestDelete,
-    statusUpdate
+    forwardSearch!,
+    backwardSearch!,
+    nextInsertEquivClass!,
+    nextDeleteEquivClass!,
+    findBestInsert!,
+    findBestDelete!,
+    score,
+    calculateMSE,
 
+#graphIO
+    saveGraph,
+    loadGraph,
+    edgetable
 end

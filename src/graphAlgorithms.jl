@@ -3,7 +3,7 @@
 ####################################################################
 
 #Revert a graph to undirected edges and unshielded colliders (i.e. parents not adjacent)
-function graphVStructure!(g::PDAG)
+function graphVStructure!(g)
     
     #loop through all vertices
     for x in vertices(g)
@@ -13,7 +13,8 @@ function graphVStructure!(g::PDAG)
         #(if there is only 1 parent, then it is still a clique)
         if isclique(g, parentsX)
             for p in parentsX
-                addedge!(g, x, p, directed=false)
+                add_edge!(g, x, p)
+                add_edge!(g, p, x)
             end
         end
     end
@@ -23,17 +24,18 @@ end
 #Thoughts on improvement
     #Would it be cleaner to find all unique triples where one edge is undirected?
     #Can this update be more local? Most edges will remain unchanged.
+    #better methods than categorizeNeighbors()? Can we avoid weird dictionary?
 
 #This is set up so we only loop through all the vertices and edges once
-function meekRules!(g::PDAG)
+function meekRules!(g)
     
     #Loop through all the edges in the graph (x-y)
     for edge in edges(g)
         #We only need to update undirected edges
-        if !edge.directed
+        if !isoriented(g, edge)
 
             #For clarity extract the edge vertices
-            x, y = edge.parent, edge.child
+            (x, y) = src(edge), dst(edge)
 
             #Label the neighbors of the nodes that comprise the current edge
             #Neighbors can be labelled "parent", "child", or "undirected"
@@ -44,31 +46,31 @@ function meekRules!(g::PDAG)
             #Check if x has a unique parent 
             if R1(xNeighbors, yNeighbors)
                 #Add x→y
-                addedge!(g, x, y)
+                orientedge!(g, x, y)
             #Check if y has a unique parent
             elseif R1(yNeighbors, xNeighbors)
                 #Add y→x
-                addedge!(g, y, x)
+                orientedge!(g, y, x)
             end
 
             #Rule 2: Direct the edge away from a potential cycle
             #Check if x has a child that is a parent of y
             if R2(xNeighbors, yNeighbors)
                 #Add x→y
-                addedge!(g, x, y)
+                orientedge!(g, x, y)
             #Check if y has a child that is a parent of x
             elseif R2(yNeighbors, xNeighbors)
                 #Add y→x
-                addedge!(g, y, x)
+                orientedge!(g, y, x)
             end
 
             #Rule 3: Double Triangle, diagonal
             if R3(xNeighbors, yNeighbors)
                 #Add x→y
-                addedge!(g, x, y)
+                orientedge!(g, x, y)
             elseif R3(yNeighbors, xNeighbors)
                 #Add y→x
-                addedge!(g, y, x)
+                orientedge!(g, y, x)
             end
 
             #Rule 4: Double Triangle, side
@@ -76,10 +78,10 @@ function meekRules!(g::PDAG)
             #So, we need to pass the graph through as well
             if R4(xNeighbors, yNeighbors, g)
                 #Add x→y
-                addedge!(g, x, y)
+                orientedge!(g, x, y)
             elseif R4(yNeighbors, xNeighbors, g)
                 #Add y→x
-                addedge!(g, y, x)
+                orientedge!(g, y, x)
             end
             
         end
@@ -146,7 +148,7 @@ end
 
 
 #Categorize neighboring edges as "parent", "child", or "undirected"
-function categorizeNeighbors(g::PDAG, x, y)
+function categorizeNeighbors(g, x, y)
     
     #Create a dictionary of neighbors (e.g. vertex 5 => :parent)
     xNeighbors = Dict{Int, Symbol}()
@@ -170,7 +172,7 @@ function categorizeNeighbors(g::PDAG, x, y)
 end
 
 
-function setCategory(g::PDAG, v₁, v₂)
+function setCategory(g, v₁, v₂)
 
     #Test if v₁ → v₂
     if isparent(g,v₁,v₂)

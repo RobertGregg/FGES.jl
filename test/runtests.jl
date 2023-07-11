@@ -3,6 +3,7 @@ using FGES
 using Test
 using Random, Statistics
 using DataFrames
+using Graphs
 
 
 
@@ -28,8 +29,8 @@ using DataFrames
 
     g = fges(data)
 
-    @test ne(g) == 458
-    @test mapreduce(isdirected, +, edges(g)) == 455
+    @test ne(g) == 538
+    @test mapreduce(x->isoriented(g,x), +, edges(g)) == 514
 end
 
 
@@ -44,7 +45,7 @@ end
 
     saveGraph(fileName1,g1)
 
-    g1Loaded = loadGraph(fileName1)
+    g1Loaded, featureNames = loadGraph(fileName1)
 
     @test g1 == g1Loaded
 
@@ -53,7 +54,7 @@ end
 
     saveGraph(fileName2,g2)
 
-    g2Loaded = loadGraph(fileName2)
+    g2Loaded, featureNames = loadGraph(fileName2)
 
     @test g2 == g2Loaded
 end
@@ -66,8 +67,8 @@ end
     g = fges(data)
     gpenalty = fges(data,penalty=2)
 
-    @test ne(g) == 230
-    @test ne(gpenalty) == 23
+    @test ne(g) == 220
+    @test ne(gpenalty) == 34
 end
 
 
@@ -81,9 +82,4 @@ end
 
     @test ne(g1) == ne(g2)
 
-    @test eltype(edges(g1)) == Edge{Int64}
-    @test eltype(alledges(g1)) == Edge{Int64}
-
-    @test eltype(edges(g2)) == Edge{String}
-    @test eltype(alledges(g2)) == Edge{String}
 end
