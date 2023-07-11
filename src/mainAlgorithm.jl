@@ -2,7 +2,7 @@
 # Data structures for algorithm
 ####################################################################
 
-@kwdef mutable struct CurrentState
+Base.@kwdef mutable struct CurrentState
     data::Matrix{Float64}
     featureNames::Vector{String}
     numFeatures::Int

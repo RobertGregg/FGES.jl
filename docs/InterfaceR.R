@@ -7,6 +7,7 @@ library(JuliaConnectoR)
 
 #Load the FGES package in from julia
 FGES <- juliaImport("FGES")
+Base <- juliaImport("Base") #Base julia functions
 
 #Create a random data matrix in R
 m <- matrix(runif(10000*100) , ncol = 100)
@@ -15,7 +16,8 @@ m <- matrix(runif(10000*100) , ncol = 100)
 g <- FGES$fges(m, verbose=TRUE)
 
 #Display the edges found by fges
-FGES$alledges(g)
+#Julia returns lazy iterator so we need to collect the output into a vector
+Base$collect( FGES$alledges(g) )
 
 #Save the graph as a text file
 FGES$saveGraph("myGraph.txt", g)
@@ -24,7 +26,7 @@ FGES$saveGraph("myGraph.txt", g)
 gload <- FGES$loadGraph("myGraph.txt")
 
 #Convert the edge list to an R dataframe
-df <- as.data.frame(FGES$edgetable(gload[[1]]))
+df <- as.data.frame(FGES$edgetable(gload))
 
 ##################################
 #Example 2: Dataframes
@@ -46,4 +48,4 @@ df <- DataFrames$DataFrame(df)
 g <- FGES$fges(df)
 
 #Display the edges found by fges
-FGES$alledges(g)
+Base$collect( FGES$alledges(g) )
