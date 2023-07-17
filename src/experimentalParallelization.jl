@@ -37,7 +37,7 @@ function findBestInsert(state::CurrentState, g, x, y)
         NTP = setdiff(ancestors(g,y), T)
 
         #NAyx ∪ T ∪ PaY ∪ X
-        NTPx = [NTP; x]
+        NTPx = [NTP; x] #TOOD union! maybe?
 
         newScore = score(state, NTPx, y) - score(state, NTP, y)
 

@@ -32,3 +32,5 @@ edge = Edge(x,y)
 @btime calculateNAyx($g,$x,$y);
 @btime calculateTyx($g,$x,$y);
 
+fges(rand(10,10))
+

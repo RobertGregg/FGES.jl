@@ -33,12 +33,13 @@ gJulia = @time fges(data; verbose=true)
 df = DataFrame(data, :auto)
 CSV.write("test/testDatasets/features$(numFeatures)_observations$(numObservations).txt", df ,delim=" ")
 
+#TODO Run java from julia
 
 #Read and parse the java results
 gJava = SimpleDiGraph(numFeatures)
 javaFilepath = "test/testDatasets/features$(numFeatures)_observations$(numObservations)_out.txt"
 
-javaResult = filter(line -> occursin(r"x\d+ \D{3} x\d+",line),readlines(open(javaFilepath)))
+javaResult = filter(line -> occursin(r"x\d+ \D{3} x\d+",line), readlines(open(javaFilepath)))
 javaResult = split.(javaResult," ")
 
 javaEdges = [parse.(Int, filter.(isdigit, line[[2,4]])) for line in javaResult]

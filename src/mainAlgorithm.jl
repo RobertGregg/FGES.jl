@@ -1,36 +1,4 @@
 ####################################################################
-# Data structures for algorithm
-####################################################################
-
-Base.@kwdef mutable struct CurrentState
-    data::Matrix{Float64}
-    featureNames::Vector{String}
-    numFeatures::Int
-    numObservations::Int
-    penalty::Float64
-    
-    x::Int = 1
-    y::Int = 2
-    bestScore::Float64 = 0.0
-    bestSubset::Vector{Int} = zeros(20)
-    scoreBoard::LRU{Tuple{Vector{Int}, Int}, Float64} = LRU{Tuple{Vector{Int}, Int}, Float64}(maxsize=5_000_000)
-    stage::String = "Forward Search"
-    verbose::Bool = true
-end
-
-function Base.show(io::IO, state::CurrentState)
-
-    printstyled(io,"Current State\n", bold=true, color=:blue)
-    println(io, "Stage: $(state.stage)")
-    println(io, "Score: $(state.bestScore)")
-    println(io, "Edge: $(state.x)→$(state.y)")
-    println(io, "Cache: $(round(100state.scoreBoard.currentsize / state.scoreBoard.maxsize, digits=3))%")
-    println(io,"----------------------------------")
-end 
-
-
-
-####################################################################
 # Main entry point for the algorithm
 ####################################################################
 
@@ -40,28 +8,18 @@ Compute a causal graph for the given observed data.
 """
 function fges(data, featureNames; penalty = 1.0, verbose=false, returnState=false)
 
-    #Get the dimensions of the input data
-    numObservations, numFeatures = size(data)
-
+    
     #Ensure the data is in the right orientation
-    if length(featureNames) ≠ numFeatures
+    if length(featureNames) ≠ size(data,2)
         error("Number of features in data do not match number of feature names. Check if data has rows as observations and columns as features.")
     end
-
-    #Append column of ones to data for intercept in linear regressions performed in scoring function
-    data = [data ones(numObservations)]
-
-    #Create an empty graph with one node for each feature
-    g = SimpleDiGraph(numFeatures)
-
+    
+    
     #Create a current state for the algorithm
-    state = CurrentState(
-        data = data,
-        featureNames = featureNames,
-        numObservations = numObservations,
-        numFeatures = numFeatures,
-        penalty = penalty,
-        verbose = verbose)
+    state = CurrentState(data, featureNames, penalty, verbose)
+    
+    #Create an empty graph with one node for each feature
+    g = SimpleDiGraph(state.numFeatures)
 
     #Forward Search
     forwardSearch!(g,state)
@@ -144,23 +102,27 @@ function forwardSearch!(g, state::CurrentState)
 end
 
 
+#TODO Need to overhaul this parallelization.
+#=
+    1) Make a serial and parallel version to experiment. 
+    2) LinearSolveBuffer needs to be local on each thread
+        - How do you avoid re-initialization each loop?
+        - https://julialang.org/blog/2023/07/PSA-dont-use-threadid/ 
+    3) R doesn't need to be copied to each thread
+    4) nextInsertEquivClass! and the like should be pure functions (currently LinearSolveBuffer and state are modified) 
+    5) Is the locking of LRUCache a bottleneck?
+
+=#
+
 """
     nextInsertEquivClass!(state, g)
 Searches through all variables pairs and finds the highest scoring edge to insert
 """
 function nextInsertEquivClass!(state, g)
     
-    #TODO This @sync locks the state from being updated which is probably a major bottleneck, currently needed to avoid race conditions
-    @sync begin
-        #Loop through all node pairs
-        for (x,y) in allpairs(vertices(g))
-            Threads.@spawn begin
-                #Only check non-adjacent pairs
-                if !isadjacent(g,x,y)
-                    findBestInsert!(state, g, x, y)
-                end
-            end
-
+    for (x,y) in allpairs(vertices(g))
+        if !isadjacent(g,x,y)
+            findBestInsert(state, g, x, y)
         end
     end
 
@@ -168,13 +130,11 @@ function nextInsertEquivClass!(state, g)
 end
 
 
-
-
 """
     findBestInsert!(state::CurrentState, g, x, y)
 Scores a given variable pair and updates the state 
 """
-function findBestInsert!(state::CurrentState, g, x, y)
+function findBestInsert(state::CurrentState, g, x, y)
 
     #The vertices neighboring y and adjacent to x need to:
         #(1) be a clique
@@ -195,14 +155,15 @@ function findBestInsert!(state::CurrentState, g, x, y)
         NTP = setdiff(ancestors(g,y), T)
 
         #NAyx ∪ T ∪ PaY ∪ X
-        NTPx = [NTP; x] #TODO: avoid vcat in hotloop
+        NTPx = [NTP; x]
 
         newScore = cached_score(state, NTPx, y) - cached_score(state, NTP, y)
 
+
         #Check if score improved
         if newScore > state.bestScore
-            state.bestSubset = T
             state.bestScore = newScore
+            state.bestSubset = T
             state.x = x
             state.y = y
         end
@@ -318,118 +279,4 @@ function findBestDelete!(state::CurrentState, g, x, y)
     end
 
     return nothing
-end
-
-
-####################################################################
-# Scoring function
-####################################################################
-
-"""
-    score(state::CurrentState, nodeParents, node)
-
-Calculates a score using the mean-squared error found by regessing `node` onto the `nodeParents`. 
-
-More Info: we want to calculate the log likelihood that `nodeParents` are the parents of our node
-
-    score = log(P(data|Model)) ≈ -BIC/2
-
-because we're only comparing log likelihoods we'll ignore the 1/2 factor. When P(⋅) is Guassian, log(P(data|Model)) takes the form:
-    score = -k⋅log(n) - n⋅log(mse)
-k is the number of free parameters, n is the number of observations, and mse is mean squared error
-"""
-function score(state::CurrentState, nodeParents, node)
-    
-    #Number of observations
-    n = state.numObservations
-    #Penalty value
-    p = state.penalty
-    
-    #Get the data for the node to be scored
-    y = view(state.data, :, node)
-    
-    #Calculate the mean squared error
-    mse = calculateMSE(state, nodeParents, y, n)
-    
-    #Number of free parameters (includes numFeatures+1)
-    k = length(nodeParents)
-
-    newscore = -p*k*log(n) - n*log(mse)
-
-    #Remove numFeatures+1 if needed
-    if state.numFeatures+1 ∈ nodeParents
-        pop!(nodeParents)
-    end
-
-    #Return the score
-    return newscore
-end
-
-
-function cached_score(state::CurrentState, nodeParents, node)
-    get!(state.scoreBoard, (nodeParents, node)) do
-        score(state, nodeParents, node)
-    end
-end
-
-"""
-    calculateMSE(state, nodeParents, y, n)
-Calculate the mean square error dependent on the length of `nodeParents`.
-"""
-function calculateMSE(state, nodeParents, y, n)
-    
-    mse = 0.0
-
-     #If nodeParents is empty the regression is a horizontal line at mean
-    if isempty(nodeParents)
-
-        mse = sum(abs2, y .- mean(y)) / n
-
-     #If nodeParents is of length 1, use explict formulas for simple regression
-    elseif length(nodeParents) == 1
-
-        #ŷ = β₁X + β₀
-        #β₁ = cov(X,y)/var(X)
-        #β₀ = mean(y) - β₁ * mean(X)
-
-        #Get the X vector
-        X  = view(state.data, :, nodeParents)
-
-        X̄ = mean(X)
-        ȳ = mean(y)
-
-        varX = 0.0
-        covXy = 0.0
-
-        for (Xᵢ, yᵢ) in zip(X,y)
-            covXy += (Xᵢ-X̄)*(yᵢ-ȳ)
-            varX += (Xᵢ-X̄)^2
-        end
-
-        β₁ = covXy/varX
-        β₀ = ȳ - β₁*X̄
-    
-        ŷ = @. β₁ * X + β₀
-
-        #Mean squared error
-        mse = sum((yᵢ - ŷᵢ)^2 for (yᵢ, ŷᵢ) in zip(y,ŷ)) / n
-
-     #Proceed with usual linear regression
-    else
-
-        #Get the data being regression onto y
-        push!(nodeParents, state.numFeatures+1)
-        X  = view(state.data, :, nodeParents)
-
-        #Perform linear regression
-        b = X \ y
-
-        #Get the estimation
-        ŷ = X*b #allocations
-
-        #Mean squared error
-        mse = sum((yᵢ - ŷᵢ)^2 for (yᵢ, ŷᵢ) in zip(y,ŷ)) / n
-    end
-
-    return mse
 end
