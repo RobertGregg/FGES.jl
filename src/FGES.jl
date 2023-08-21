@@ -5,10 +5,10 @@ using LinearAlgebra #for qr
 using Statistics #mean
 using Graphs #FGES works on DAGs
 using Combinatorics #loop through combinations and permutations
-using LRUCache #Caching scores
-using Dates #record the current time
+using OrderedCollections #Caching scores
 using DataFrames #To allow dataframe inputs to fges
 using ThreadsX #parallelization
+using GLMakie, NetworkLayout #plotting PDAGs
 
 
 
@@ -19,6 +19,7 @@ include("graphAlgorithms.jl")
 include("score.jl")
 include("mainAlgorithm.jl")
 include("graphIO.jl")
+include("graphPlotter.jl")
 
 
 #For now export everything to make testing easier
@@ -36,7 +37,7 @@ export
     isparent,
     ischild,
     isdescendent,
-    isoriented,
+    isdirected,
     isclique,
 
     neighbors,
@@ -44,6 +45,7 @@ export
     children,
     descendents,
     ancestors,
+    adjacencies,
 
     isblocked,
     orientedge!,
@@ -74,5 +76,8 @@ export
 #graphIO
     saveGraph,
     loadGraph,
-    edgetable
+    edgetable,
+
+#graphPlotter
+    plotNetwork
 end

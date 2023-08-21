@@ -26,7 +26,8 @@ for i in 1:numFeatures
 end
 
 #Run the julia version of FGES and time it
-gJulia = @time fges(data; verbose=true)
+fges(rand(10,10))
+gJulia, state = @time fges(data; verbose=true, returnState=true)
 
 
 #Save the dataset to run for java

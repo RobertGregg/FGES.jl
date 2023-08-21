@@ -52,7 +52,7 @@ Modify the graph `g` by directing the edge `state.x`→`state.y`. Additionally, 
 """
 function Insert!(g, state::CurrentState) 
 
-    #Add a directed edge x→y
+    #Add a directed edge x→y (currently no edge present)
     add_edge!(g, state.x, state.y)
     
     #Orient all edges incident into child node
@@ -74,7 +74,7 @@ function forwardSearch!(g, state::CurrentState)
     #Loop until state.bestScore is negative
     while true
 
-        #Get the next best step
+        #Get the next best score and store it in bestScore
         nextInsertEquivClass!(state, g)
 
         if state.verbose
@@ -88,10 +88,10 @@ function forwardSearch!(g, state::CurrentState)
         #Update the graph
         Insert!(g, state) 
 
-        #Covert the PDAG to a complete PDAG
+        #Convert the PDAG to a skeleton w/ v-structures
         graphVStructure!(g)
 
-        #Apply the 4 Meek rules to orient some edges in the graph
+        #Apply Meek rules to orient some edges in the graph
         meekRules!(g)
 
         #Reset the score
@@ -111,7 +111,6 @@ end
     3) R doesn't need to be copied to each thread
     4) nextInsertEquivClass! and the like should be pure functions (currently LinearSolveBuffer and state are modified) 
     5) Is the locking of LRUCache a bottleneck?
-
 =#
 
 """
@@ -136,40 +135,57 @@ Scores a given variable pair and updates the state
 """
 function findBestInsert(state::CurrentState, g, x, y)
 
-    #The vertices neighboring y and adjacent to x need to:
-        #(1) be a clique
-        #(2) block all semi-directed paths
-    #These will hold true regardless of T
+    #Get (the parents of y) and (the neighbors of y adjacent to x)
+    PaY = parents(g,y)
     NAyx = calculateNAyx(g,y,x)
 
-    if !(isclique(g, NAyx) && isblocked(g, y, x, NAyx))
-        return nothing
-    end
+    #This will need to hold true regardless of T
+    !isclique(g, NAyx) && return nothing
+    
+    # Keep a list of invalid sets
+    invalid = Vector{Vector{Int}}()
 
-
-    #If those criteria are met,
     #Loop through all subsets of T
     for T in powerset(collect(calculateTyx(g,y,x)))
 
-        #NAyx ∪ T ∪ PaY
-        NTP = setdiff(ancestors(g,y), T)
-
-        #NAyx ∪ T ∪ PaY ∪ X
-        NTPx = [NTP; x]
-
-        newScore = cached_score(state, NTPx, y) - cached_score(state, NTP, y)
-
-
-        #Check if score improved
-        if newScore > state.bestScore
-            state.bestScore = newScore
-            state.bestSubset = T
-            state.x = x
-            state.y = y
+        if isSuperSet(T, invalid)
+            continue
         end
+
+        NAyxT = NAyx ∪ T
+
+        # Validity of insert operator
+        if isclique(g, NAyxT) && isblocked(g, y, x, NAyxT)
+
+
+            newScore = cached_score(state, NAyxT ∪ PaY ∪ x, y) - 
+                        cached_score(state, NAyxT ∪ PaY, y)
+
+            #Check if score improved
+            if newScore > state.bestScore
+                state.bestScore = newScore
+                state.bestSubset = T
+                state.x = x
+                state.y = y
+            end
+        else
+            # Record that the subset T is invalid
+            push!(invalid, T)
+        end
+
     end
 
     return nothing
+end
+
+# Check if the set T is a superset of any invalid set
+function isSuperSet(T, invalid)
+    for I in invalid
+        if I ⊆ T
+            return true
+        end
+    end
+    return false
 end
 
 ####################################################################
@@ -259,13 +275,14 @@ Scores a given variable pair and updates the state
 """
 function findBestDelete!(state::CurrentState, g, x, y)
 
+    PAy = parents(g,y)
+    PAy⁻ = Iterators.filter(!isequal(x), PAy)
+
     #Loop through all subsets of H
     for H in powerset(collect(calculateNAyx(g,y,x)))
 
         if isclique(g,H)
 
-            PAy = parents(g,y)
-            PAy⁻ = Iterators.filter(!isequal(x), PAy)
             newScore = cached_score(state, H ∪ PAy⁻, y) - cached_score(state, H ∪ PAy, y)
 
             #Check if score improved

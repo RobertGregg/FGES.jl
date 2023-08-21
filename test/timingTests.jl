@@ -17,7 +17,7 @@ edge = Edge(x,y)
 @btime isparent($g,$x,$y)
 @btime ischild($g,$x,$y)
 @btime isclique($g,$vecNodes)
-@btime isoriented($g,$edge)
+@btime isdirected($g,$edge)
 @btime isblocked($g,$x,$y,$vecNodes) #allocates
 
 

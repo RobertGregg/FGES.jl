@@ -1,52 +1,80 @@
-function nextInsertEquivClass!(state, g)
-    
-    
-    (state.bestScore, state.bestSubset, state.x, state.y) = ThreadsX.mapreduce(max, allpairs(vertices(g))) do (x,y)
-        if !isadjacent(g,x,y)
-            findBestInsert(state, g, x, y)
-        else
-            (0.0,Int[],x,y)
-        end
-    end
+using Combinatorics
 
+#Helper function to loop through pairs of data columns
+allpairs(v) = Iterators.filter(i -> isless(i...), Iterators.product(v,v))
 
-    return nothing
-end
-
-function findBestInsert(state::CurrentState, g, x, y)
+function maxScore(data)
 
     bestScore = 0.0
-    bestSubset = Int[]
 
-    #The vertices neighboring y and adjacent to x need to:
-        #(1) be a clique
-        #(2) block all semi-directed paths
-    #These will hold true regardless of T
-    NAyx = calculateNAyx(g,y,x)
+    for (i,j) in allpairs(axes(data,2))
+        
+        if isodd(i+j)
+            currentScore = findscore(data,i,j)
 
-    if !(isclique(g, NAyx) && isblocked(g, y, x, NAyx))
-        return (bestScore, bestSubset)
-    end
-
-
-    #If those criteria are met,
-    #Loop through all subsets of T
-    for T in powerset(collect(calculateTyx(g,y,x)))
-
-        #NAyx ∪ T ∪ PaY
-        NTP = setdiff(ancestors(g,y), T)
-
-        #NAyx ∪ T ∪ PaY ∪ X
-        NTPx = [NTP; x] #TOOD union! maybe?
-
-        newScore = score(state, NTPx, y) - score(state, NTP, y)
-
-        #Check if score improved
-        if newScore > state.bestScore
-            bestScore = newScore
-            bestSubset = T
+            if bestScore < currentScore
+                bestScore = currentScore
+            end
         end
     end
 
-    return (bestScore, bestSubset)
+    return bestScore
+end
+
+function findscore(data, i, j)
+    
+    bestScoreSubset = 0.0
+
+    #Create a somewhat small subset
+    subsets = mod1(i+j,10)
+
+    for subset in powerset(1:subsets)
+
+        currentScoreSubset = score(data,subset,j)
+
+        if bestScoreSubset < currentScoreSubset
+            bestScoreSubset = currentScoreSubset
+        end
+
+    end
+
+    return bestScoreSubset
+end
+
+function score(data,subset,j)
+
+    if isempty(subset)
+        return 0.0
+    end
+    
+    X = view(data,:,subset)
+    y = view(data,:,j)
+
+    b = X \ y
+
+    ŷ = X*b
+
+    return sum((yᵢ - ŷᵢ)^2 for (yᵢ, ŷᵢ) in zip(y,ŷ))
+end
+
+
+
+using Floops
+
+function maxScore_par(data)
+
+    @floop for (i,j) in allpairs(axes(data,2))
+
+        currentScore = findscore(data,i,j)
+
+        if isodd(i+j)
+            @reduce() do (bestScore = 0.0; currentScore)
+                if bestScore < currentScore
+                    bestScore = currentScore
+                end
+            end
+        end
+    end
+
+    return bestScore
 end

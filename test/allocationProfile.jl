@@ -6,8 +6,8 @@ using Random, Statistics
 
 Random.seed!(314)
 #Generate a dataset
-numFeatures = 100
-numObservations = 1000
+numFeatures = 10
+numObservations = 100
 data = zeros(numObservations, numFeatures)
 
 #number of previous features to use in caluclating the next feature

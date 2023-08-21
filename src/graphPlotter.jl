@@ -1,5 +1,3 @@
-using GLMakie, NetworkLayout
-
 #Smaller r will result in shorter edges
 function nudge(r,p1,p2)
     θ =  atan(last(p2-p1), first(p2-p1))
@@ -17,7 +15,7 @@ function plotNetwork(g; arrowgap=0.1, arrowsize=20, nodesize=30, layoutmethod=sh
     
     #Determine the arrowheads
     heads =  fill('▲', ne(g))
-    tails = [isoriented(g, edge) ? ' ' : '▲' for edge in edges(g)]
+    tails = [isdirected(g, edge) ? ' ' : '▲' for edge in edges(g)]
     
     #Calculate the node positions
     nodePositions = layoutmethod(adjacency_matrix(g))

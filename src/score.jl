@@ -42,12 +42,9 @@ function score(state::CurrentState, nodeParents, node)
     return newscore
 end
 
-
-function cached_score(state::CurrentState, nodeParents, node)
-    get!(state.scoreBoard, (nodeParents, node)) do
-        score(state, nodeParents, node)
-    end
-end
+####################################################################
+# Mean squared error
+####################################################################
 
 """
     calculateMSE(state, nodeParents, y, n)
@@ -61,7 +58,6 @@ function calculateMSE(state, nodeParents, y, n)
         return sum(abs2, y .- mean(y)) / n
     end
 
-
     #If nodeParents is of length 1, use explict formulas for simple regression
     if length(nodeParents) == 1
 
@@ -69,8 +65,11 @@ function calculateMSE(state, nodeParents, y, n)
         #β₁ = cov(X,y)/var(X)
         #β₀ = mean(y) - β₁ * mean(X)
 
-        #Get the X vector
-        X  = view(state.data, :, nodeParents)
+        #Get the X and ŷ vectors
+        @views begin
+            X  = state.data[:, nodeParents]
+            ŷ = state.buffer.ŷ[:]
+        end
 
         X̄ = mean(X)
         ȳ = mean(y)
@@ -86,7 +85,7 @@ function calculateMSE(state, nodeParents, y, n)
         β₁ = covXy/varX
         β₀ = ȳ - β₁*X̄
     
-        ŷ = @. β₁ * X + β₀
+        @. ŷ = β₁ * X + β₀
 
         #Mean squared error
         return sum((yᵢ - ŷᵢ)^2 for (yᵢ, ŷᵢ) in zip(y,ŷ)) / n
@@ -151,6 +150,7 @@ function qless!(b,X,y,R,Rsub,subset)
             Rsub[i-1,j] = r
             Rsub[i,j] = 0.0
 
+            #Givens rotations modify the ith and (i-1) rows after j
             for k in j+1:numCol
                 (r1, r2) = Rsub[i-1,k], Rsub[i,k]
                 Rsub[i-1,k] = G.c*r1 + G.s*r2
@@ -168,3 +168,15 @@ function qless!(b,X,y,R,Rsub,subset)
 
     return nothing
 end
+
+
+####################################################################
+# Scoring function Cache
+####################################################################
+
+function cached_score(state::CurrentState, nodeParents, node)
+    get!(state.scoreBoard, (nodeParents, node)) do
+        score(state, nodeParents, node)
+    end
+end
+

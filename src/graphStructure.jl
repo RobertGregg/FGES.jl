@@ -6,16 +6,13 @@
 
 #The Graphs.jl edges() function outputs 1→2 and 2→1 if edge is undirected
 #Here we're making a new iterator to avoid that
-
-#This type is not used in the main algorithm, but is for IO
+#In theory, I shoul define a new graph type, but that would be involved
 
 """
-    Edge(parent, child, directed::Bool)
-    Edge(Tuple(parent,child), directed::Bool)
-    Edge(CartesianIndex(parent,child), directed::Bool)
+    GraphEdge(parent, child, directed::Bool)
+    GraphEdge(Tuple(parent,child), directed::Bool)
+    GraphEdge(CartesianIndex(parent,child), directed::Bool)
 A data type to hold edge information.
-
-It is also possible to convert a `Tuple` into an Edge.
 """
 struct GraphEdge
     parent::Int
@@ -30,7 +27,7 @@ struct IterEdge{G<:Graphs.AbstractGraph}
 end
 
 #(Remove the double counted edges)
-Base.length(iterEdge::IterEdge) = ne(iterEdge.g) - (mapreduce(x->!isoriented(iterEdge.g,x), +, edges(iterEdge.g)) ÷ 2)
+Base.length(iterEdge::IterEdge) = ne(iterEdge.g) - mapreduce(x->!isdirected(iterEdge.g,x), +, edges(iterEdge.g)) ÷ 2
 
 Base.eltype(::Type{IterEdge{T}}) where T = GraphEdge
 
@@ -60,7 +57,7 @@ function Base.iterate(iterEdge::IterEdge, state=(1,0))
     g = iterEdge.g
     (src, i) = state
     
-    #Get the next edge skipping out unidrected edges
+    #Get the next edge skipping over unidrected edges
     while src ≤ nv(g)
         
         adjacencies = g.fadjlist[src]
@@ -104,6 +101,7 @@ end
 Return an iterator to generate all edges within the graph `g`. Similar to `Graphs.edges()` but does not double count undirected edges
 """
 alledges(g) = IterEdge(g)
+allUndirectedEdges(g) = Iterators.filter(edge->!edge.directed, alledges(g))
 
 ####################################################################
 # Relationship between two verticies
@@ -146,24 +144,24 @@ isdescendent(g, x, y) = has_edge(g,y,x)
 
 
 """
-    isoriented(g, edge::Edge)
-    isoriented(g, x, y)
+    isdirected(g, edge::Edge)
+    isdirected(g, x, y)
 Test if `x` and `y` are connected by a directed edge in the graph `g`, either x←y OR x→y.
 Can also perform the same test given an `edge`.
 """
-isoriented(g, edge) = has_edge(g,edge) ⊻ has_edge(g,reverse(edge)) # xor
-isoriented(g, x, y) = has_edge(g,x,y) ⊻ has_edge(g,y,x)
+isdirected(g, edge) = has_edge(g,edge) ⊻ has_edge(g,reverse(edge)) # xor
+isdirected(g, x, y) = has_edge(g,x,y) ⊻ has_edge(g,y,x)
 
 
 
 """
     isclique(g, nodes)
-Return `true` if all vertices in `nodes` are connected to each other in the graph `g`.
+Return `true` if all vertices in `nodes` are undirected neighbors in the graph `g`.
 """
 function isclique(g, nodes)
 
     for (x,y) in allpairs(nodes)
-        if !isadjacent(g, x, y)
+        if !isneighbor(g, x, y)
             return false
         end
     end
@@ -191,11 +189,13 @@ descendents(g, x) = g.fadjlist[x]
 #All vertices that are connected but not a child
 ancestors(g, x) = g.badjlist[x]
 
+#All vertices connected to x
+adjacencies(g, x) = union(g.fadjlist[x], g.badjlist[x])
+
 
 ####################################################################
 # FGES Specific functions
 ####################################################################
-
 
 """
     isblocked(g, src, dst, nodesRemoved)
@@ -219,8 +219,8 @@ function isblocked(g, src, dst, nodesRemoved)
     end
 
     #For there to be a semi-directed path...
-    #src needs to have a child
-    isempty(children(g, src)) && return true
+    #src needs to have a descendent not in nodesRemoved
+    isempty(Iterators.filter(x->x∉nodesRemoved, descendents(g,src))) && return true
     #dst needs an ancestor not in nodesRemoved
     isempty(Iterators.filter(x->x∉nodesRemoved, ancestors(g,dst))) && return true
 
@@ -241,15 +241,17 @@ function isblocked(g, src, dst, nodesRemoved)
 
 end
 
-
-
 """
     orientedge!(g, x, y)
 Update the edge `x`-`y` to `x`→`y` in the graph `g`. 
 """
 function orientedge!(g, x, y)
-    add_edge!(g,x,y)
-    rem_edge!(g,y,x) #TODO Might not be needed
+
+    #Check if x-y exists
+    !isneighbor(g,x,y) && return nothing
+
+    #Remove the backwards edge to direct
+    rem_edge!(g,y,x) 
     return nothing
 end
 
